@@ -2,6 +2,8 @@
 /Figures
 /cormack/old
 /cormack/*.pro
+/cormack/CVS
+/cormack/*.sav
 /Draft_model/TB_logs
 /Draft_model/src/TB_logs
 /Draft_model/lightning_logs
