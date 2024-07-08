@@ -1,0 +1,11 @@
+/Data
+/Figures
+/cormack/old
+/cormack/*.pro
+/Draft_model/TB_logs
+/Draft_model/src/TB_logs
+/Draft_model/lightning_logs
+/Draft_model/src/__pycache__
+/Draft_model/data
+/Draft_model/__pycache__
+/References
