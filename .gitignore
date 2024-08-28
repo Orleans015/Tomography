@@ -1,4 +1,5 @@
 /Data
+/Data/*.sav
 /Figures
 /cormack/old
 /cormack/*.pro

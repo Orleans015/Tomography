@@ -131,8 +131,9 @@ def reconstruct_emissivity_from_XYEMISS(shot):
     dot_1c = np.dot(J1_xr, a1cl)
     dot_1s = np.dot(J1_xr, a1sl)
     g_r_t[ind] = dot_0c + dot_1c*np.cos(angles) + dot_1s*np.sin(angles)
-    g_r_t[ind][radii > 1] = -20
-    # g_r_t[ind][radii > 1.05] = -4.977
+    g_r_t[ind][np.where(g_r_t[ind] < 0)] = 0
+    g_r_t[ind][radii > 1.0] = -5
+    g_r_t[ind][radii > 1.1] = -10
   return g_r_t/radius
 
 # This function is used to plot the emissivity profile, it takes the emissivity 
@@ -308,13 +309,12 @@ def main2():
   dst_e = data.st_e
   # extract the emissivity matrix
   emissivity_sav = dst_e.EMISS[0]
-  i = 150
-  print(f"Max emiss. mio: {np.max(emissivity_profile[i])}")
-  print(f"Max emiss. Sav: {np.max(emissivity_sav[i])}")
-  print(emissivity_profile[i][55] - emissivity_sav[i][55])
-  # print(emissivity_sav[i][55])
+  i = 300
 
   plot_emissivity_from_mesh(emissivity_profile[i], shot)
+  plt.imshow(emissivity_sav[i])
+  plt.colorbar()
+  plt.show()
   show_error(read_struct(shot).st_e.EMISS[0][i], emissivity_profile[i], shot)
   plt.plot(emissivity_profile[i][55])
   plt.plot(emissivity_sav[i][55])
@@ -322,3 +322,7 @@ def main2():
 
 if __name__ == '__main__':
   main2()
+
+  # Bidirectional GRU
+  # Transformer (BERT)
+  
