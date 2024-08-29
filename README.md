@@ -1,1 +1,1 @@
-Mirror of the repository at gitlab.igi.cnr.it/tomo-rfx.git
+Source repository for the tomography reconstruction via machine learning of the emissivity for the Reversed Field pinch eXperiment RFX-mod
