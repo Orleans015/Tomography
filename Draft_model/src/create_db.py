@@ -146,7 +146,7 @@ def augment_data(logical_array, prel_array, data_array, error_array):
 
 def create_db():
     # Load the data from all the .sav file in the directory
-    dir = '/home/orleans/projects/Tomography/Data'
+    dir = '/home/orleans/projects/Tomography/Data/sav_files/'
     data = []
     for file in os.listdir(dir):
         if file.endswith('.sav'):
