@@ -12,6 +12,9 @@ sample_dtype = np.dtype(
         ('time', np.float32), # Time of the shot
         ('data', np.float32, (92,)), # data in the bright struct the detectors
         ('data_err', np.float32, (92,)), # error on data in the bright struct
+        # Coordinates of the lines of sight, to be implemented
+        # ('p', np.float32, (106,)), # impact parameters of the detectors l.o.s.
+        # ('phi', np.float32, (106,)), # poloidal angles of the detectors l.o.s.
         
         # # THE SIZE OF THESE ARRAYS IS TO BE DETERMINED
         # ('data_vert', np.float32, (106,)), # Brightness of the vertical detectors
@@ -32,8 +35,6 @@ sample_dtype = np.dtype(
         ('b_tor', np.float32, (24,)), # amplitude of the toroidal modes 
         ('b_rad', np.float32, (24,)), # amplitude of the radial modes
         ('phi_tor', np.float32, (24,)), # phases of the toroidal mode
-        # ('p', np.float32, (106,)), # impact parameters of the detectors l.o.s.
-        # ('phi', np.float32, (106,)), # poloidal angles of the detectors l.o.s.
     ]    
   )
 
@@ -119,6 +120,7 @@ def augment_data(logical_array, prel_array, data_array, error_array):
     new_error = []
 
     # Coordinates of the most complete prel array
+    # Still have to figure out if the most complete prel array is the same for all the shots
     logical = np.array([   3,    4,    5,    6,    7,    8,    9,   10,   12,   13,   14,
          15,   16,   17,   18,   19,   22,   23,   24,   25,   26,   27,
          28,   29,   30,   31,   32,   33,   34,   35,   36,   37,   39,
@@ -137,12 +139,20 @@ def augment_data(logical_array, prel_array, data_array, error_array):
             new_data.append(data_array[index])
             new_error.append(error_array[index])
         else: # if elem is not in logical_array then i have to append a -1 to the data, but in the correct position
-            new_prel.append(-1)
-            new_data.append(-1)
-            new_error.append(-1)
+            new_prel.append(np.nan)
+            new_data.append(np.nan)
+            new_error.append(np.nan)
 
     # Return the modified coordinates
     return np.array(new_prel), np.array(new_data), np.array(new_error)
+
+def get_coefficients(file):
+    dir = "/home/orleans/projects/Tomography/Data/"
+    filename = os.join(dir, file)
+    data = np.load(filename)
+    # Now I have to compute the coefficients for each time instant in the .npy file
+    pass
+
 
 def create_db():
     # Load the data from all the .sav file in the directory
