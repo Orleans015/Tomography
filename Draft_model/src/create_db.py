@@ -2,7 +2,6 @@ from scipy.io import readsav
 import numpy as np
 import pandas as pd
 import os
-import h5py
 
 # define a sample of an element in the database
 sample_dtype = np.dtype(
@@ -155,28 +154,27 @@ def get_coefficients(file):
 
 
 def create_db():
-    # Load the data from all the .sav file in the directory
-    dir = '/home/orleans/projects/Tomography/Data/sav_files/'
-    data = []
-    for file in os.listdir(dir):
-        if file.endswith('.sav'):
-            data.append(read_tomography(file))
-        else:
-            pass
-    data = np.concatenate(data)
-    # Save data in npy format
-    np.save('/home/orleans/projects/Tomography/Data/data.npy', data)
-    # save data in .hdf5 format using h5py
-    with h5py.File('/home/orleans/projects/Tomography/Data/data.hdf5', 'w') as f:
-        f.create_dataset('data', data=data)
-
-    return data
+    '''
+    This funciton reads the data directory and looks for the data.npy file, if
+    the file already exists then it reads all of the .sav files in the sav_files
+    directory and saves them in a .npy file named data.npy
+    '''
+    dir = '../data/sav_files/'
+    file = 'data.npy'
+    if os.path.exists(dir + file):
+        return 
+    else:
+        data = []
+        for file in os.listdir(dir):
+            if file.endswith('.sav'):
+                data.append(read_tomography(file))
+            else:
+                pass
+        data = np.concatenate(data)
+        # Save data in npy format
+        np.save(os.path.join(dir, file), data)
+        return
 
 if __name__ == "__main__":
-    # for file in os.listdir('/home/orleans/projects/Tomography/Data/sav_files/'):
-    #     if file.endswith('.sav'):
-    #         read_tomography(file)
-    #     else:
-    #         print(f'File {file} not found')
     create_db()
     

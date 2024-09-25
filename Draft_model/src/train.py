@@ -9,7 +9,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 torch.set_float32_matmul_precision("medium")
 
 def main():
-    logger = TensorBoardLogger("TB_logs", name="my_MNIST_model")
+    logger = TensorBoardLogger("TB_logs", name="my_Tomo_model")
 
     model = NN(
         inputsize=config.INPUTSIZE,

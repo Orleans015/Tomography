@@ -7,6 +7,7 @@ NUM_EPOCHS = 10
 
 # Dataset
 DATA_DIR = '../data/'
+FILE_NAME = 'data.npy'
 NUM_WORKERS = 4
 
 # Compute related
