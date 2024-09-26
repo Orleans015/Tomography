@@ -33,7 +33,7 @@ def main():
         precision=config.PRECISION,
         callbacks=[PrintingCallback(),
                    EarlyStopping(monitor="val_loss"),
-                   L.Callback()],
+                   ],
     )
 
     # the following function does not exist in version 2.2, the one i am using

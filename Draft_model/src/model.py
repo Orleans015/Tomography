@@ -12,23 +12,18 @@ class NN(L.LightningModule):
     super().__init__()
     self.lr = learning_rate
     self.net = nn.Sequential(
-        nn.Linear(inputsize, 184),  # Define a linear layer with input size and output size
+        nn.Linear(inputsize, 128),  # Define a linear layer with input size and output size
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(184, 368),  # Define another linear layer
+        nn.Linear(128, 128),  # Define another linear layer
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(368, 736),  # Define another linear layer
+        nn.Linear(128, 128),  # Define another linear layer
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(736, 736),  # Define another linear layer
-        nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(736, 368),  # Define another linear layer
-        nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(368, 184),  # Define another linear layer
-        nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(184, outputsize)  # Define Final linear layer with output size
+        nn.Linear(128, outputsize)  # Define Final linear layer with output size
     )
     self.loss_fn = nn.MSELoss()  # Define the loss function as CrossEntropyLoss
+    self.best_val_loss = torch.tensor(float('inf'))  # Initialize the best validation loss
     self.mae = torchmetrics.MeanAbsoluteError() # Define Root Mean Squared Error metric
-    self.md = torchmetrics.MinkowskiDistance(p=3)  # Define F1 score metric
+    self.md = torchmetrics.MinkowskiDistance(p=4)  # Define F1 score metric
     self.training_step_outputs = []  # Initialize an empty list to store training step outputs
 
   def forward(self, x):
@@ -37,27 +32,48 @@ class NN(L.LightningModule):
   
   def training_step(self, batch, batch_idx):
     x, y = batch
-    loss, scores, y = self._common_step(batch, batch_idx)  # Compute loss, scores, and target using a common step function
-    mae = self.mae(scores, y)  # Compute mae using the scores and target
-    md = self.md(scores, y)  # Compute F1 score using the scores and target
+    loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
+    mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
+    md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target
     self.training_step_outputs.append(loss)  # Append the loss to the training step outputs list
     self.log_dict({'train_loss': loss,
                    'train_mae': mae,
                    'train_md': md},
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the training loss, mae, and F1 score
-    return {"loss": loss, "preds": scores, "target": y}
+    return {"loss": loss, "preds": y_hat, "target": y}
   
   def on_train_epoch_end(self):
     avg_loss = torch.stack(self.training_step_outputs).mean()  # Compute the average loss over all training steps
     self.log('train_loss_mean', avg_loss)  # Log the average training loss
     self.training_step_outputs.clear()  # Clear the training step outputs list to free up memory
 
-  
+  '''
+  #####################################################################
+  # This section contains the implementation of the validation epoch  #
+  # end method. It computes the average validation loss over all      #
+  # validation steps and logs it.                                     #
+  #####################################################################
+
+  def on_validation_epoch_end(self, outputs):
+    avg_loss = torch.stack([x['loss'] for x in outputs]).mean()  # Compute the average validation loss over all validation steps
+    self.log('val_loss_mean', avg_loss)  # Log the average validation loss
+
+  #####################################################################
+    # Then one should implement the following:
+        if loss < self.best_val_loss:
+        self.best_val_loss = loss  # Update the best validation loss
+        # save the model
+        print("saving model...")
+        torch.save(self.state_dict(), "/TB_logs/SaveBest/best_model_.pth")
+        print("...model saved")
+  '''
+
   def validation_step(self, batch, batch_idx):
-    loss, scores, y = self._common_step(batch, batch_idx)  # Compute loss, scores, and target using a common step function
-    mae = self.mae(scores, y)  # Compute mae using the scores and target
-    md = self.md(scores, y)  # Compute F1 score using the scores and target
+    loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
+    # calculate metrics
+    mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
+    md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target
     self.log_dict({'val_loss': loss,
                    'val_mae': mae,
                    'val_md': md},
@@ -66,9 +82,9 @@ class NN(L.LightningModule):
     return loss
   
   def test_step(self, batch, batch_idx):
-    loss, scores, y = self._common_step(batch, batch_idx)  # Compute loss, scores, and target using a common step function
-    mae = self.mae(scores, y)  # Compute mae using the scores and target
-    md = self.md(scores, y)  # Compute F1 score using the scores and target
+    loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
+    mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
+    md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target
     self.log_dict({'test_loss': loss,
                    'test_mae': mae,
                    'test_md': md},
@@ -78,15 +94,15 @@ class NN(L.LightningModule):
   
   def _common_step(self, batch, batch_idx):
     x, y = batch
-    scores = self(x)  # Compute the scores by passing the input through the network
-    loss = self.loss_fn(scores, y)  # Compute the loss using the scores and target
-    return loss, scores, y
+    y_hat = self(x)  # Compute the y_hat (prediction) by passing the input through the network
+    loss = self.loss_fn(y_hat, y)  # Compute the loss using the y_hat (prediction) and target
+    return loss, y_hat, y
   
   def predict_step(self, batch, batch_idx):
     x, y = batch
     x = x.reshape(x.size(0), -1)  # Reshape the input tensor
-    scores = self(x)  # Compute the scores by passing the input through the network
-    preds = torch.argmax(scores, dim=1)  # Compute the predicted labels
+    y_hat = self(x)  # Compute the y_hat (prediction) by passing the input through the network
+    preds = torch.argmax(y_hat, dim=1)  # Compute the predicted labels
     return preds
   
   def configure_optimizers(self):
