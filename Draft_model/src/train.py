@@ -1,7 +1,7 @@
 import lightning as L
 import torch
 from model import NN
-from dataset import MnistDataModule, TomographyDataModule
+from dataset import TomographyDataModule
 import config
 from callbacks import PrintingCallback, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -17,8 +17,9 @@ def main():
         outputsize=config.OUTPUTSIZE,
     )
 
-    dm = MnistDataModule(
+    dm = TomographyDataModule(
         data_dir=config.DATA_DIR,
+        file_name=config.FILE_NAME,
         batch_size=config.BATCH_SIZE,
         num_workers=config.NUM_WORKERS,
     )
@@ -31,7 +32,7 @@ def main():
         max_epochs=config.NUM_EPOCHS,
         precision=config.PRECISION,
         callbacks=[PrintingCallback(),
-                   EarlyStopping(monitor="train_accuracy"),
+                   EarlyStopping(monitor="val_loss"),
                    L.Callback()],
     )
 
@@ -41,7 +42,17 @@ def main():
     trainer.fit(model, dm)
     trainer.validate(model, dm)
     trainer.test(model, dm)
-
+    return model, dm
 
 if __name__ == "__main__":
-    main()
+    model, dm = main()
+    # # Test the model on a batch from the test set
+    # test_loader = dm.test_dataloader()
+    # test_batch = next(iter(test_loader))
+    # x, y = test_batch
+    # model.eval()
+    # with torch.no_grad():
+    #     pred = model(x)
+    # print("Predicted: ", pred)
+    # print("Actual: ", y)
+    # print("Difference: ", pred - y)

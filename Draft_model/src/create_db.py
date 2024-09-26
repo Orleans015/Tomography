@@ -1,8 +1,7 @@
 from scipy.io import readsav
 import numpy as np
-import pandas as pd
 import os
-
+import config
 # define a sample of an element in the database
 sample_dtype = np.dtype(
     [
@@ -159,9 +158,10 @@ def create_db():
     the file already exists then it reads all of the .sav files in the sav_files
     directory and saves them in a .npy file named data.npy
     '''
+    data_dir = config.DATA_DIR
     dir = '../data/sav_files/'
     file = 'data.npy'
-    if os.path.exists(dir + file):
+    if os.path.exists(data_dir + file):
         return 
     else:
         data = []
@@ -172,7 +172,7 @@ def create_db():
                 pass
         data = np.concatenate(data)
         # Save data in npy format
-        np.save(os.path.join(dir, file), data)
+        np.save(os.path.join(data_dir, file), data)
         return
 
 if __name__ == "__main__":
