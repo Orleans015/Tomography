@@ -43,32 +43,6 @@ class NN(L.LightningModule):
                    )  # Log the training loss, mae, and F1 score
     return {"loss": loss, "preds": y_hat, "target": y}
   
-  def on_train_epoch_end(self):
-    avg_loss = torch.stack(self.training_step_outputs).mean()  # Compute the average loss over all training steps
-    self.log('train_loss_mean', avg_loss)  # Log the average training loss
-    self.training_step_outputs.clear()  # Clear the training step outputs list to free up memory
-
-  '''
-  #####################################################################
-  # This section contains the implementation of the validation epoch  #
-  # end method. It computes the average validation loss over all      #
-  # validation steps and logs it.                                     #
-  #####################################################################
-
-  def on_validation_epoch_end(self, outputs):
-    avg_loss = torch.stack([x['loss'] for x in outputs]).mean()  # Compute the average validation loss over all validation steps
-    self.log('val_loss_mean', avg_loss)  # Log the average validation loss
-
-  #####################################################################
-    # Then one should implement the following:
-        if loss < self.best_val_loss:
-        self.best_val_loss = loss  # Update the best validation loss
-        # save the model
-        print("saving model...")
-        torch.save(self.state_dict(), "/TB_logs/SaveBest/best_model_.pth")
-        print("...model saved")
-  '''
-
   def validation_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     # calculate metrics

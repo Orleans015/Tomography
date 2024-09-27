@@ -3,7 +3,7 @@ import torch
 from model import NN
 from dataset import TomographyDataModule
 import config
-from callbacks import PrintingCallback, EarlyStopping
+from callbacks import PrintingCallback, SaveBest, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 
 torch.set_float32_matmul_precision("medium")
@@ -32,6 +32,7 @@ def main():
         max_epochs=config.NUM_EPOCHS,
         precision=config.PRECISION,
         callbacks=[PrintingCallback(),
+                   SaveBest(monitor="val_loss", logger=logger),
                    EarlyStopping(monitor="val_loss"),
                    ],
     )
