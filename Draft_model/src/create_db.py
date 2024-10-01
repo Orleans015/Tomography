@@ -2,6 +2,9 @@ from scipy.io import readsav
 import numpy as np
 import os
 import config
+from scipy.interpolate import BSpline, splrep 
+from tqdm import tqdm
+
 # define a sample of an element in the database
 sample_dtype = np.dtype(
     [
@@ -55,7 +58,7 @@ def maximum_los():
 
 
 def read_tomography(file): 
-    dir = "/home/orleans/projects/Tomography/Data/sav_files/"
+    dir = "../data/sav_files/"
     # Load the data from the .sav file
     try:
         datum = readsav(dir + file)
@@ -69,42 +72,60 @@ def read_tomography(file):
     sample = np.empty(n_tot, dtype=sample_dtype)
     if len(datum['st']['bright'][0]['data'][0][0]) == 92:
         print('The data is already in the correct format')
+        k = 0
         for i in range(n_tot):
-            tempo = st_e['t'][0][i]
-            tt = np.rint(tempo*1e4)
-            shot = st_e['shot'][0]
-            label = r'%5d_%04d' % (shot, tt)
-            sample[i]['label'] = label
-            sample[i]['shot'] = shot
-            sample[i]['time'] = tempo
-            sample[i]['data'] = datum['st']['bright'][0]['data'][0][i]
-            sample[i]['data_err'] = datum['st']['bright'][0]['err'][0][i]
-            sample[i]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
-            sample[i]['emiss'] = st_e['emiss'][0][i]
+            if (discriminate_data(np.sort(datum['st_e']['prel_vert'][0]),
+                                 datum['st_e']['bright_vert'][0][i][np.argsort(datum['st_e']['prel_vert'][0])],
+                                 datum['st_e']['err_vert'][0][i][np.argsort(datum['st_e']['prel_vert'][0])]) &
+                discriminate_data(np.sort(datum['st_e']['prel_hor'][0]),
+                                 datum['st_e']['bright_hor'][0][i][np.argsort(datum['st_e']['prel_hor'][0])],
+                                 datum['st_e']['err_hor'][0][i][np.argsort(datum['st_e']['prel_hor'][0])])):
+                tempo = st_e['t'][0][i]
+                tt = np.rint(tempo*1e4)
+                shot = st_e['shot'][0]
+                label = r'%5d_%04d' % (shot, tt)
+                sample[i - k]['label'] = label
+                sample[i - k]['shot'] = shot
+                sample[i - k]['time'] = tempo
+                sample[i - k]['data'] = datum['st']['bright'][0]['data'][0][i]
+                sample[i - k]['data_err'] = datum['st']['bright'][0]['err'][0][i]
+                sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
+                sample[i - k]['emiss'] = st_e['emiss'][0][i]
+            else:
+                k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
         sample['y_emiss'] = st_e['Y_EMISS'][0]
         sample['majr'] = st_e['MAJR'][0]
         sample['minr'] = st_e['radius'][0]
     else:
         print(f'Augmenting data for shot {st_e["shot"][0]}')
+        k = 0
         for i in range(n_tot):
-            # Augment the data to have the same number of lines of sight and brightness
-            # The underscore in the first argument is a placeholder for the lines of sight
-            _, sample[i]['data'], sample[i]['data_err'] = augment_data(
-                datum['st']['bright'][0]['logical'][0],
-                datum['st']['bright'][0]['prel'][0],
-                datum['st']['bright'][0]['data'][0][i],
-                datum['st']['bright'][0]['err'][0][i]
-                )        
-            tempo = st_e['t'][0][i]
-            tt = np.rint(tempo*1e4)
-            shot = st_e['shot'][0]
-            label = r'%5d_%04d' % (shot, tt)
-            sample[i]['label'] = label
-            sample[i]['shot'] = shot
-            sample[i]['time'] = tempo
-            sample[i]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
-            sample[i]['emiss'] = st_e['emiss'][0][i]
+            if (discriminate_data(np.sort(datum['st_e']['prel_vert'][0]),
+                                 datum['st_e']['bright_vert'][0][i][np.argsort(datum['st_e']['prel_vert'][0])],
+                                 datum['st_e']['err_vert'][0][i][np.argsort(datum['st_e']['prel_vert'][0])]) &
+                discriminate_data(np.sort(datum['st_e']['prel_hor'][0]),
+                                 datum['st_e']['bright_hor'][0][i][np.argsort(datum['st_e']['prel_hor'][0])],
+                                 datum['st_e']['err_hor'][0][i][np.argsort(datum['st_e']['prel_hor'][0])])):
+                # Augment the data to have the same number of lines of sight and brightness
+                # The underscore in the first argument is a placeholder for the lines of sight
+                _, sample[i - k]['data'], sample[i - k]['data_err'] = augment_data(
+                    datum['st']['bright'][0]['logical'][0],
+                    datum['st']['bright'][0]['prel'][0],
+                    datum['st']['bright'][0]['data'][0][i],
+                    datum['st']['bright'][0]['err'][0][i]
+                    )        
+                tempo = st_e['t'][0][i]
+                tt = np.rint(tempo*1e4)
+                shot = st_e['shot'][0]
+                label = r'%5d_%04d' % (shot, tt)
+                sample[i - k]['label'] = label
+                sample[i - k]['shot'] = shot
+                sample[i - k]['time'] = tempo
+                sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
+                sample[i - k]['emiss'] = st_e['emiss'][0][i]
+            else:
+                k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
         sample['y_emiss'] = st_e['Y_EMISS'][0]
         sample['majr'] = st_e['MAJR'][0]
@@ -151,6 +172,30 @@ def get_coefficients(file):
     # Now I have to compute the coefficients for each time instant in the .npy file
     pass
 
+def discriminate_data(x, y, yerr):
+    '''
+    This function gets the x and y data (meaning the coordinates and the 
+    brilliances) from the .sav file and returns True if the data points in the y 
+    array (of the brilliance) are at distance less than a certain percentage of 
+    the reconstructed value via spline (tipically 10%) from the reconstructed 
+    value. At least 80% of the data points must be at a distance less than the
+    threshold in order for the profile to be kept. 
+    '''
+    # Compute the spline
+    tck = splrep(x, y, w=1/yerr, k=3, s=25)
+    # Compute the reconstructed value
+    y_reconstructed = BSpline(*tck)
+    # Compute the threshold
+    threshold = 0.1*np.max(y_reconstructed(x))
+    # Compute the distance between the reconstructed value and the data points
+    distance = np.abs(y - y_reconstructed(x))
+    # Compute the number of points that are at a distance less than the threshold
+    n_points = np.sum(distance < threshold)
+    # Check if the profile is to be kept
+    if n_points >= 0.8*len(y):
+        return True
+    else:
+        return False
 
 def create_db():
     '''
@@ -160,21 +205,25 @@ def create_db():
     '''
     data_dir = config.DATA_DIR
     dir = '../data/sav_files/'
-    file = 'data.npy'
+    file = config.FILE_NAME
     if os.path.exists(data_dir + file):
         return 
     else:
         data = []
-        for file in os.listdir(dir):
+        for file in tqdm(os.listdir(dir)):
             if file.endswith('.sav'):
                 data.append(read_tomography(file))
             else:
                 pass
-        data = np.concatenate(data)
+        if len(data) != 0:
+            data = np.concatenate(data)
         # Save data in npy format
         np.save(os.path.join(data_dir, file), data)
         return
 
 if __name__ == "__main__":
     create_db()
+    data = np.load(os.join(config.DATA_DIR, config.FILE_NAME))
+    print(data.shape)
+    print(len(data[0]))
     
