@@ -7,7 +7,7 @@ import lightning as L
 import torchvision
 
 
-class NN(L.LightningModule):
+class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
     self.lr = learning_rate

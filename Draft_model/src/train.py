@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from model import NN
+from model import TomoModel
 from dataset import TomographyDataModule
 import config
 from callbacks import PrintingCallback, SaveBest, EarlyStopping
@@ -11,7 +11,7 @@ torch.set_float32_matmul_precision("medium")
 def main():
     logger = TensorBoardLogger("TB_logs", name="my_Tomo_model")
 
-    model = NN(
+    model = TomoModel(
         inputsize=config.INPUTSIZE,
         learning_rate=config.LEARNING_RATE,
         outputsize=config.OUTPUTSIZE,
