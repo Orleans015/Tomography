@@ -119,18 +119,18 @@ def read_tomography(file):
                 tt = np.rint(tempo*1e4)
                 shot = st_e['shot'][0]
                 label = r'%5d_%04d' % (shot, tt)
-                sample[i - k]['label'] = label
-                sample[i - k]['shot'] = shot
-                sample[i - k]['time'] = tempo
-                sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
-                sample[i - k]['emiss'] = st_e['emiss'][0][i]
+                sample[i-k]['label'] = label
+                sample[i-k]['shot'] = shot
+                sample[i-k]['time'] = tempo
+                sample[i-k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
+                sample[i-k]['emiss'] = st_e['emiss'][0][i]
             else:
                 k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
         sample['y_emiss'] = st_e['Y_EMISS'][0]
         sample['majr'] = st_e['MAJR'][0]
         sample['minr'] = st_e['radius'][0]
-    return sample
+    return sample[:i-k+1]
 
 def augment_data(logical_array, prel_array, data_array, error_array):
     # Create new arrays to store the modified data
@@ -158,9 +158,9 @@ def augment_data(logical_array, prel_array, data_array, error_array):
             new_data.append(data_array[index])
             new_error.append(error_array[index])
         else: # if elem is not in logical_array then i have to append a -1 to the data, but in the correct position
-            new_prel.append(np.nan)
-            new_data.append(np.nan)
-            new_error.append(np.nan)
+            new_prel.append(-1)
+            new_data.append(-1)
+            new_error.append(-1)
 
     # Return the modified coordinates
     return np.array(new_prel), np.array(new_data), np.array(new_error)
