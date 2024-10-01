@@ -81,3 +81,4 @@ class NN(L.LightningModule):
   
   def configure_optimizers(self):
     return optim.Adam(self.parameters(), lr=self.lr)  # Use Adam optimizer with the specified learning rate
+  

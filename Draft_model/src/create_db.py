@@ -210,9 +210,9 @@ def create_db():
         return 
     else:
         data = []
-        for file in tqdm(os.listdir(dir)):
-            if file.endswith('.sav'):
-                data.append(read_tomography(file))
+        for f in tqdm(os.listdir(dir)):
+            if f.endswith('.sav'):
+                data.append(read_tomography(f))
             else:
                 pass
         if len(data) != 0:
@@ -223,7 +223,7 @@ def create_db():
 
 if __name__ == "__main__":
     create_db()
-    data = np.load(os.join(config.DATA_DIR, config.FILE_NAME))
+    data = np.load(os.path.join(config.DATA_DIR, config.FILE_NAME))
     print(data.shape)
     print(len(data[0]))
     
