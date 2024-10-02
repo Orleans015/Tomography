@@ -8,11 +8,11 @@ from tqdm import tqdm
 # define a sample of an element in the database
 sample_dtype = np.dtype(
     [
-        ('label', np.str_, 10), # Label of the sample
-        ('shot', np.int32), # Shot number
-        ('time', np.float32), # Time of the shot
-        ('data', np.float32, (92,)), # data in the bright struct the detectors
-        ('data_err', np.float32, (92,)), # error on data in the bright struct
+        ('label', np.str_, 10), # Label of the sample (ex: 30810_0140)
+        ('shot', np.int32), # Shot number (ex: 30810)
+        ('time', np.float32), # Time of the shot (ex: 0.0140)
+        ('data', np.float32, (92,)), # data in the bright struct the detectors (Line of sight)
+        ('data_err', np.float32, (92,)), # error on data in the bright struct (error on line of sight)
         # Coordinates of the lines of sight, to be implemented
         # ('p', np.float32, (106,)), # impact parameters of the detectors l.o.s.
         # ('phi', np.float32, (106,)), # poloidal angles of the detectors l.o.s.
@@ -27,8 +27,8 @@ sample_dtype = np.dtype(
         ('emiss', np.float32, (110,110)), # Emissivity in the mesh
         ('x_emiss', np.float32, (110,)), # Vector of x coordinates for the mesh
         ('y_emiss', np.float32, (110,)), # Vector of y coordinates for the mesh
-        ('majr', np.float32), # Major radius of the plasma
-        ('minr', np.float32), # Minor radius of the plasma
+        ('majr', np.float32), # Major radius of the machine (for rfx-mod is 2m)
+        ('minr', np.float32), # Minor radius of the plasma (for rfx-mod is 0.459m)
         # Amplitudes and phases of the m = 1, n = -7 to -24 modes, b_tor are the
         # toroidal modes, b_rad are the radial modes, phi_tor are the phases of
         # the toroidal magnetic in the poloidal plane computed at 202.5 degrees,

@@ -6,6 +6,7 @@ from model import TomoModel
 from dataset import TomographyDataModule
 import config
 import matplotlib.pyplot as plt
+from scipy.special import j0, j1, jn_zeros
 
 def visualize():
   # Define an instance of the model
@@ -23,6 +24,8 @@ def visualize():
   data_module.setup()
   # Define the dataloaders
   val_loader = data_module.val_dataloader()
+  print(f"Validation dataset: {val_loader.dataset[0]}")
+  assert False, "Stop here"
   test_loader = data_module.test_dataloader()
   # input_data = val_loader.dataset[0][0].unsqueeze(0)
   # reference = val_loader.dataset[0][1]
@@ -66,6 +69,43 @@ def visualize():
   # print some art to separate the results
   print("*" * 50)
   # print(f"Test results: {t}")
+
+def generate_map(coefficients):
+  """
+  Generate the tomography map starting from the coefficients
+  """
+  m = 2
+  l = 7
+  radius = 0.459
+  # Define the grid
+  x_emiss = .../radius
+  y_emiss = .../radius
+  x_emiss, y_emiss = np.meshgrid(x_emiss, y_emiss)
+  # change the grid to polar coordinates
+  radii  = np.sqrt(x_emiss**2 + y_emiss**2)
+  angles = np.arctan2(y_emiss, x_emiss)
+  # compute the Bessel zeros
+  zeros = np.array([jn_zeros(im, l) for im in range(m)])
+  zero = np.zeros(1)
+  zero = np.concatenate((zero, zeros[1,:-1]))
+  zeros[1] = zero # all this to add a zero at the beginning of the array!!!
+  # compute the Bessel functions 
+  J0_xr = np.array([j0(zeros[0]*r) for r in radii.ravel()])
+  J1_xr = np.array([j1(zeros[1]*r) for r in radii.ravel()])
+  # reshape the arrays
+  J0_xr = J0_xr.reshape(len(radii), len(radii[0]), len(zeros[0]))
+  J1_xr = J1_xr.reshape(len(radii), len(radii[0]), len(zeros[1]))
+  # initialize the map
+  g_r_t = np.zeros((len(radii), len(angles)))
+  # compute the map
+  a0cl, a1cl, a1sl = np.split(coefficients, 3)
+  dot0_c = np.dot(J0_xr, a0cl)
+  dot1_c = np.dot(J1_xr, a1cl)
+  dot1_s = np.dot(J1_xr, a1sl)
+  g_r_t = dot0_c + dot1_c * np.cos(angles) + dot1_s * np.sin(angles)
+  g_r_t[np.where(g_r_t < 0)] = 0 # get rid of negative values (unphysical)
+  g_r_t[radii > 1.0] = -10 # set the values outside the circle to -10
+  return g_r_t/radius # return the normalized mapz
 
 if __name__ == "__main__":
   visualize()

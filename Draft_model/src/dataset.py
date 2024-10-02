@@ -3,8 +3,6 @@ import torch
 import numpy as np
 import os
 import torch.utils
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 import create_db as c_db
@@ -21,7 +19,6 @@ class TomographyDataset(torch.utils.data.Dataset):
     # Here i have the entire dataset in a dictionary with keys 'data' and 'target'
     self.data = torch.Tensor(bloated_dataset['data'])
     self.target = torch.Tensor(bloated_dataset['target'])
-
 
   def __len__(self):
     return len(self.data)
@@ -58,7 +55,6 @@ class TomographyDataModule(L.LightningDataModule):
     # Load the dataset
     entire_dataset = TomographyDataset(self.data_dir, self.file_name)
     # Split the dataset into train, validation, and test sets
-    ds_len = len(entire_dataset) # Get the length of the dataset
     generator = torch.Generator().manual_seed(42) # Seed for reproducibility
     # Here the actual split takes place, 80% for training, 10% for validation, and 10% for testing
     self.train_ds, self.val_ds, self.test_ds = random_split(entire_dataset,
