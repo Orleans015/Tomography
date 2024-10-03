@@ -31,7 +31,6 @@ class TomoModel(L.LightningModule):
     return x
   
   def training_step(self, batch, batch_idx):
-    x, y = batch
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target

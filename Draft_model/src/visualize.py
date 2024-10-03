@@ -14,9 +14,7 @@ def visualize():
   # Load the best model
   version_num = 4
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
-  model.load_state_dict(torch.load(
-    f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",
-    )['state_dict'])
+  model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
   print(model)
   # Define the data module
   data_module = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
@@ -24,8 +22,7 @@ def visualize():
   data_module.setup()
   # Define the dataloaders
   val_loader = data_module.val_dataloader()
-  print(f"Validation dataset: {val_loader.dataset[0]}")
-  assert False, "Stop here"
+  # print(f"Validation dataset: {val_loader.dataset[0]}")
   test_loader = data_module.test_dataloader()
   # input_data = val_loader.dataset[0][0].unsqueeze(0)
   # reference = val_loader.dataset[0][1]
@@ -61,8 +58,8 @@ def visualize():
 
   # plot the results
   plt.figure()
-  plt.plot(val_reference.detach().numpy(), label="Reference", color='orange', marker='o')
-  plt.plot(v.detach().numpy(), label="Prediction", color='blue', linestyle='dashed', marker='x')
+  plt.plot(val_reference[0].detach().numpy(), label="Reference", color='orange', marker='o')
+  plt.plot(v[0].detach().numpy(), label="Prediction", color='blue', linestyle='dashed', marker='x')
   # plt.legend()
   plt.savefig("results.png")
 
@@ -70,20 +67,29 @@ def visualize():
   print("*" * 50)
   # print(f"Test results: {t}")
 
-def generate_map(coefficients):
+def generate_maps(dataloader, model):
   """
   Generate the tomography map starting from the coefficients
   """
-  m = 2
-  l = 7
-  radius = 0.459
-  # Define the grid
-  x_emiss = .../radius
-  y_emiss = .../radius
+  # get the machine radius
+  radius = dataloader.dataset.dataset.minr[0]
+  # Define the grid, i want to access the x_emiss and y_emiss values in the dataset
+  x_emiss = (dataloader.dataset.dataset.x_emiss[0] - dataloader.dataset.dataset.majr[0])/radius
+  y_emiss = dataloader.dataset.dataset.y_emiss[0]/radius
+  # create the meshgrid
   x_emiss, y_emiss = np.meshgrid(x_emiss, y_emiss)
   # change the grid to polar coordinates
   radii  = np.sqrt(x_emiss**2 + y_emiss**2)
   angles = np.arctan2(y_emiss, x_emiss)
+
+  # get the precomputed coefficients
+  pc_coeffs = dataloader.dataset.dataset.target
+  # get the coefficients from the model
+  coefficients = model(dataloader.dataset.dataset.data).detach().numpy()
+  
+  # Define the orders of the bessel functions
+  m = 2
+  l = 7
   # compute the Bessel zeros
   zeros = np.array([jn_zeros(im, l) for im in range(m)])
   zero = np.zeros(1)
@@ -95,17 +101,62 @@ def generate_map(coefficients):
   # reshape the arrays
   J0_xr = J0_xr.reshape(len(radii), len(radii[0]), len(zeros[0]))
   J1_xr = J1_xr.reshape(len(radii), len(radii[0]), len(zeros[1]))
-  # initialize the map
-  g_r_t = np.zeros((len(radii), len(angles)))
-  # compute the map
-  a0cl, a1cl, a1sl = np.split(coefficients, 3)
-  dot0_c = np.dot(J0_xr, a0cl)
-  dot1_c = np.dot(J1_xr, a1cl)
-  dot1_s = np.dot(J1_xr, a1sl)
-  g_r_t = dot0_c + dot1_c * np.cos(angles) + dot1_s * np.sin(angles)
-  g_r_t[np.where(g_r_t < 0)] = 0 # get rid of negative values (unphysical)
-  g_r_t[radii > 1.0] = -10 # set the values outside the circle to -10
-  return g_r_t/radius # return the normalized mapz
+  
+  # initialize the maps
+  g_r_t_model = np.zeros((len(radii), len(angles)))
+  g_r_t_pc = np.zeros((len(radii), len(angles)))
+
+  for index in range(len(pc_coeffs)):
+    # compute the map from the model
+    a0cl, a1cl, a1sl = np.split(coefficients[index], 3)
+    dot0_c = np.dot(J0_xr, a0cl)
+    dot1_c = np.dot(J1_xr, a1cl)
+    dot1_s = np.dot(J1_xr, a1sl)
+    g_r_t_model = dot0_c + dot1_c * np.cos(angles) + dot1_s * np.sin(angles)
+    g_r_t_model[np.where(g_r_t_model < 0)] = 0 # get rid of negative values (unphysical)
+    g_r_t_model[radii > 1.0] = -10 # set the values outside the circle to -10
+
+    # compute the map from the precomputed coefficients
+    a0cl, a1cl, a1sl = np.split(pc_coeffs[index], 3)
+    dot0_c = np.dot(J0_xr, a0cl)
+    dot1_c = np.dot(J1_xr, a1cl)
+    dot1_s = np.dot(J1_xr, a1sl)
+    g_r_t_pc = dot0_c + dot1_c * np.cos(angles) + dot1_s * np.sin(angles)
+    g_r_t_pc[np.where(g_r_t_pc < 0)] = 0 # get rid of negative values (unphysical)
+    g_r_t_pc[radii > 1.0] = -10 # set the values outside the circle to -10
+    return g_r_t_model/radius, g_r_t_pc/radius # return the normalized maps
 
 if __name__ == "__main__":
-  visualize()
+  # Load the data and the model
+  datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
+  datamodule.setup()
+  val_loader = datamodule.val_dataloader()
+
+  model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
+  version_num = 4
+  assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
+  model.load_state_dict(torch.load(
+    f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",
+    )['state_dict'])
+  
+  # Generate the maps
+  model_map, pc_map = generate_maps(val_loader, model)
+  # plot the maps side by side
+  fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+  im0 = axs[0].imshow(model_map, cmap='viridis', interpolation='nearest')
+  axs[0].set_title("Model map")
+  # plot the colorbar rescaled by 60%
+  fig.colorbar(im0, ax=axs[0], shrink=0.6)
+
+  im1 = axs[1].imshow(pc_map, cmap='viridis', interpolation='nearest')
+  axs[1].set_title("Precomputed map")
+  fig.colorbar(im1, ax=axs[1], shrink=0.6)
+  # compute the difference between the two maps
+  diff_map = np.abs(model_map - pc_map)#/np.max(pc_map)
+  im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+  axs[2].set_title("Difference map")
+  fig.colorbar(im2, ax=axs[2], shrink=0.6)
+
+  # save the figure
+  fig.savefig("maps.png")
+  plt.show()

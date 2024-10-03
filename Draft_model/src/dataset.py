@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 import create_db as c_db
 
+# Togliere la dataset class e usare direttamente il datamodule?
 class TomographyDataset(torch.utils.data.Dataset):
   def __init__(self, data_dir, file_name):
     self.data_dir = data_dir
@@ -17,8 +18,22 @@ class TomographyDataset(torch.utils.data.Dataset):
       allow_pickle=True
       )
     # Here i have the entire dataset in a dictionary with keys 'data' and 'target'
+    # Data and target are the input and output of the model
     self.data = torch.Tensor(bloated_dataset['data'])
     self.target = torch.Tensor(bloated_dataset['target'])
+    # The following data is not used duing training, but it is useful for visualization
+    self.labels = bloated_dataset['label']
+    self.shots = bloated_dataset['shot']
+    self.time = bloated_dataset['time']
+    self.dataerr = bloated_dataset['data_err']
+    self.emiss = bloated_dataset['emiss']
+    self.x_emiss = bloated_dataset['x_emiss']
+    self.y_emiss = bloated_dataset['y_emiss']
+    self.majr = bloated_dataset['majr']
+    self.minr = bloated_dataset['minr']
+    self.b_tor = bloated_dataset['b_tor']
+    self.b_rad = bloated_dataset['b_rad']
+    self.phi_tor = bloated_dataset['phi_tor']
 
   def __len__(self):
     return len(self.data)
