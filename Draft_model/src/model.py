@@ -11,18 +11,20 @@ class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
     self.lr = learning_rate
+    self.layersize = 512
     self.net = nn.Sequential(
-        nn.Linear(inputsize, 128),  # Define a linear layer with input size and output size
+        nn.Linear(inputsize, self.layersize),  # Define a linear layer with input size and output size
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(128, 128),  # Define another linear layer
+        nn.Linear(self.layersize, self.layersize),  # Define another linear layer
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(128, 128),  # Define another linear layer
+        nn.Linear(self.layersize, self.layersize),  # Define another linear layer
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(128, outputsize)  # Define Final linear layer with output size
+        nn.Linear(self.layersize, outputsize)  # Define Final linear layer with output size
     )
     self.loss_fn = nn.MSELoss()  # Define the loss function as CrossEntropyLoss
     self.best_val_loss = torch.tensor(float('inf'))  # Initialize the best validation loss
     self.mae = torchmetrics.MeanAbsoluteError() # Define Root Mean Squared Error metric
+    self.r2 = torchmetrics.R2Score()  # Define R2 score metric, using the multioutput parameter the metric will return an array of R2 scores for each output
     self.md = torchmetrics.MinkowskiDistance(p=4)  # Define F1 score metric
     self.training_step_outputs = []  # Initialize an empty list to store training step outputs
 
@@ -33,10 +35,12 @@ class TomoModel(L.LightningModule):
   def training_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
-    md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target
+    r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
+    md = self.md(y_hat, y)  # Compute md using the y_hat (prediction) and target
     self.training_step_outputs.append(loss)  # Append the loss to the training step outputs list
     self.log_dict({'train_loss': loss,
                    'train_mae': mae,
+                   'train_r2': r2,
                    'train_md': md},
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the training loss, mae, and F1 score
@@ -46,9 +50,11 @@ class TomoModel(L.LightningModule):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     # calculate metrics
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
-    md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target
+    r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
+    md = self.md(y_hat, y)  # Compute md using the y_hat (prediction) and target
     self.log_dict({'val_loss': loss,
                    'val_mae': mae,
+                   'val_r2': r2,
                    'val_md': md},
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the validation loss, mae, and F1 score
@@ -57,9 +63,11 @@ class TomoModel(L.LightningModule):
   def test_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
-    md = self.md(y_hat, y)  # Compute F1 score using the y_hat (prediction) and target
+    r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
+    md = self.md(y_hat, y)  # Compute md using the y_hat (prediction) and target
     self.log_dict({'test_loss': loss,
                    'test_mae': mae,
+                   'test_r2': r2,
                    'test_md': md},
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the test loss, mae, and F1 score
