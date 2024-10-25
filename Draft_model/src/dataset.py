@@ -6,6 +6,7 @@ import torch.utils
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 import create_db as c_db
+import utils
 
 # Togliere la dataset class e usare direttamente il datamodule?
 class TomographyDataset(torch.utils.data.Dataset):
@@ -27,19 +28,20 @@ class TomographyDataset(torch.utils.data.Dataset):
     self.time = bloated_dataset['time']
     self.dataerr = bloated_dataset['data_err']
     self.emiss = bloated_dataset['emiss']
-    self.x_emiss = bloated_dataset['x_emiss']
-    self.y_emiss = bloated_dataset['y_emiss']
-    self.majr = bloated_dataset['majr']
-    self.minr = bloated_dataset['minr']
+    self.x_emiss = bloated_dataset['x_emiss'][0]
+    self.y_emiss = bloated_dataset['y_emiss'][0]
+    self.majr = bloated_dataset['majr'][0]
+    self.minr = bloated_dataset['minr'][0]
     self.b_tor = bloated_dataset['b_tor']
     self.b_rad = bloated_dataset['b_rad']
     self.phi_tor = bloated_dataset['phi_tor']
+    self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles = utils.compute_bessel_n_mesh(self.minr, self.majr, self.x_emiss, self.y_emiss)
 
   def __len__(self):
     return len(self.data)
 
   def __getitem__(self, idx):
-    return self.data[idx], self.target[idx]
+    return self.data[idx], self.target[idx], self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles
 
 class TomographyDataModule(L.LightningDataModule):
   def __init__(self, data_dir, file_name, batch_size, num_workers=4):

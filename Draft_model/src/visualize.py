@@ -72,10 +72,10 @@ def generate_maps(dataloader, model):
   Generate the tomography map starting from the coefficients
   """
   # get the machine radius
-  radius = dataloader.dataset.dataset.minr[0]
+  radius = dataloader.dataset.dataset.minr
   # Define the grid, i want to access the x_emiss and y_emiss values in the dataset
-  x_emiss = (dataloader.dataset.dataset.x_emiss[0] - dataloader.dataset.dataset.majr[0])/radius
-  y_emiss = dataloader.dataset.dataset.y_emiss[0]/radius
+  x_emiss = (dataloader.dataset.dataset.x_emiss - dataloader.dataset.dataset.majr)/radius
+  y_emiss = dataloader.dataset.dataset.y_emiss/radius
   # create the meshgrid
   x_emiss, y_emiss = np.meshgrid(x_emiss, y_emiss)
   # change the grid to polar coordinates
@@ -133,7 +133,7 @@ if __name__ == "__main__":
   val_loader = datamodule.val_dataloader()
 
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  version_num = 21
+  version_num = 37
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(
     f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",
@@ -152,11 +152,11 @@ if __name__ == "__main__":
   axs[1].set_title("Precomputed map")
   fig.colorbar(im1, ax=axs[1], shrink=0.6)
   # compute the difference between the two maps
-  diff_map = np.abs(model_map - pc_map)/np.max(pc_map)
+  diff_map = np.abs(model_map - pc_map)#/np.max(pc_map)
   im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
   axs[2].set_title("Difference map")
   fig.colorbar(im2, ax=axs[2], shrink=0.6)
 
   # save the figure
-  fig.savefig("maps.png")
+  fig.savefig(f"maps_{version_num}.png")
   plt.show()
