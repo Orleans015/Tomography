@@ -137,6 +137,13 @@ def plot_maps(model, dataloader):
   # get the batch
   batch = next(iter(val_loader))
   y_hat = model(batch[0])
+  # if any of the values is -10 in the batch then denormalize the coefficients
+  if -10 in batch[0]:
+    # denormalize the coefficients
+    print("Denormalizing the coefficients")
+    print(f"Mean: {dataloader.mean}")
+    print(f"Std: {dataloader.std}")
+    y_hat = (y_hat * dataloader.std) + dataloader.mean
   # compute the emissivity maps
   em, em_hat = model.calc_em(batch, y_hat)
   
@@ -148,6 +155,9 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
    them through the index variable. It then plots the maps side by side and 
    their mean squared difference. It eventually saves the figure as a png file.
   '''
+  # check if the folder for the saved figures exists
+  if not os.path.exists(f"../plots/maps/version_{version_num}"):
+    os.makedirs(f"../plots/maps/version_{version_num}")
   # select one of the maps from the batches em and em_hat
   em_map = em[index].detach().numpy()
   em_hat_map = em_hat[index].detach().numpy()
@@ -205,7 +215,7 @@ if __name__ == "__main__":
   # plt.show()
   start = time.time()
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  version_num = 41
+  version_num = 45
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
 

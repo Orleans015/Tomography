@@ -41,6 +41,8 @@ class TomographyDataset(torch.utils.data.Dataset):
     return len(self.data)
 
   def __getitem__(self, idx):
+    # Return the data and target for the given index, the other data is used only 
+    # if the dataset is used for the computation of the emissivity maps.
     return self.data[idx], self.target[idx], self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles
 
 class TomographyDataModule(L.LightningDataModule):
@@ -50,6 +52,8 @@ class TomographyDataModule(L.LightningDataModule):
     self.file_name = file_name
     self.batch_size = batch_size
     self.num_workers = num_workers
+    self.mean = 0.
+    self.std = 0.
 
   def prepare_data(self):
     '''
@@ -71,6 +75,15 @@ class TomographyDataModule(L.LightningDataModule):
     '''
     # Load the dataset
     entire_dataset = TomographyDataset(self.data_dir, self.file_name)
+    # normalize the data but only the ones that are greater than 0
+    mask_pos = entire_dataset.data > 0 # Get the data containing real values from the diagnostic
+    mask_neg = entire_dataset.data < 0 # Get the data not containing real values from the diagnostic
+    entire_dataset.data[mask_pos] = (entire_dataset.data[mask_pos] - entire_dataset.data[mask_pos].mean()) / entire_dataset.data[mask_pos].std() # Normalize the real values
+    entire_dataset.data[mask_neg] = -10 # Set the non-real values to -10
+    # normalize the targets
+    self.mean = entire_dataset.target.mean()
+    self.std = entire_dataset.target.std()
+    entire_dataset.target = (entire_dataset.target - self.mean) / self.std
     # Split the dataset into train, validation, and test sets
     generator = torch.Generator().manual_seed(42) # Seed for reproducibility
     # Here the actual split takes place, 80% for training, 10% for validation, and 10% for testing

@@ -12,22 +12,24 @@ class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
     self.lr = learning_rate
-    #self.layersize = 512
+    # Leaky ReLU activation function takes as argument the negative slope of the
+    # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
+    # of the negative slope is 0.01.
     self.net = nn.Sequential(
         nn.Linear(inputsize, 128),  # Define a linear layer with input size and output size
-        nn.ReLU(),  # Apply ReLU activation function
+        nn.LeakyReLU(),  # Apply ReLU activation function
         nn.Linear(128, 128),  # Define another linear layer
-        nn.ReLU(),  # Apply ReLU activation function
+        nn.LeakyReLU(),  # Apply ReLU activation function
         nn.Linear(128, 128),  # Define another linear layer
-        nn.ReLU(),  # Apply ReLU activation function
+        nn.LeakyReLU(),  # Apply ReLU activation function
         nn.Linear(128, outputsize)  # Define Final linear layer with output size
     )
     self.loss_rate = 0.2  # Define the loss rate
-    self.loss_fn = nn.MSELoss()  # Define the loss function as CrossEntropyLoss
+    self.loss_fn = nn.L1Loss()  # Define the loss function as CrossEntropyLoss
     self.best_val_loss = torch.tensor(float('inf'))  # Initialize the best validation loss
+    self.mse = torchmetrics.MeanSquaredError()  # Define Mean Squared Error metric
     self.mae = torchmetrics.MeanAbsoluteError() # Define Root Mean Squared Error metric
     self.r2 = torchmetrics.R2Score()  # Define R2 score metric, using the multioutput parameter the metric will return an array of R2 scores for each output
-    self.md = torchmetrics.MinkowskiDistance(p=4)  # Define F1 score metric
     self.training_step_outputs = []  # Initialize an empty list to store training step outputs
     
   def forward(self, x):
@@ -36,14 +38,15 @@ class TomoModel(L.LightningModule):
   
   def training_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
+    mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    md = self.md(y_hat, y)  # Compute md using the y_hat (prediction) and target
     self.training_step_outputs.append(loss)  # Append the loss to the training step outputs list
     self.log_dict({'train_loss': loss,
+                   'train_mse': mse,
                    'train_mae': mae,
                    'train_r2': r2,
-                   'train_md': md},
+                   },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the training loss, mae, and F1 score
     return {"loss": loss, "preds": y_hat, "target": y}
@@ -51,26 +54,28 @@ class TomoModel(L.LightningModule):
   def validation_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     # calculate metrics
+    mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    md = self.md(y_hat, y)  # Compute md using the y_hat (prediction) and target
     self.log_dict({'val_loss': loss,
+                   'val_mse': mse,
                    'val_mae': mae,
                    'val_r2': r2,
-                   'val_md': md},
+                   },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the validation loss, mae, and F1 score
     return loss
   
   def test_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
+    mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    md = self.md(y_hat, y)  # Compute md using the y_hat (prediction) and target
     self.log_dict({'test_loss': loss,
+                   'test_mse': mse,
                    'test_mae': mae,
                    'test_r2': r2,
-                   'test_md': md},
+                   },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the test loss, mae, and F1 score
     return loss
@@ -78,13 +83,19 @@ class TomoModel(L.LightningModule):
   def _common_step(self, batch, batch_idx):
     x, y = batch[0], batch[1]
     y_hat = self(x)  # Compute the y_hat (prediction) by passing the input through the network
-    em, em_hat = self.calc_em(batch, y_hat) # Compute the tomography map using the coefficients
+    # # Compute the emissivity maps using the coefficients
+    #em, em_hat = self.calc_em(batch, y_hat) # Compute the tomography map using the coefficients
     
+    # Compute the loss using the y_hat (prediction) and target
+    loss = self.loss_fn(y_hat, y)
+
     # The following lines are used to set the value of the loss_rate variable (0.2)
     # print(f"MSE on the coefficients vector: {self.loss_fn(y_hat, y)}")
     # print(f"MSE on the emissivity maps: {self.loss_fn(em_hat, em)}")
 
-    loss = ((1 - self.loss_rate) * self.loss_fn(y_hat, y)) + (self.loss_rate * self.loss_fn(em_hat, em))  # Compute the loss using the y_hat (prediction) and target
+    # # This is the loss function computed as a weighted sum of the loss on the 
+    # # coefficients vector and the loss on the emissivity maps
+    # loss = ((1 - self.loss_rate) * self.loss_fn(y_hat, y)) + (self.loss_rate * self.loss_fn(em_hat, em))  # Compute the loss using the y_hat (prediction) and target
     return loss, y_hat, y
   
   def predict_step(self, batch, batch_idx):
@@ -98,6 +109,11 @@ class TomoModel(L.LightningModule):
     return optim.Adam(self.parameters(), lr=self.lr)  # Use Adam optimizer with the specified learning rate
   
   def calc_em(self, batch, y_hat):
+    '''
+    Compute the emissivity maps using the coefficients. The coefficients are
+    used to compute the emissivity maps using the Bessel functions. The emissivity
+    maps are then normalized and the constraints are applied.
+    '''
     _, y, j0, j1, em, em_hat, radii, angles = batch
     # # Print the shape of the radii and angles tensors
     # print(f"Radii shape: {radii.shape}")
