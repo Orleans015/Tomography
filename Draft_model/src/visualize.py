@@ -144,6 +144,7 @@ def plot_maps(model, dataloader):
     print(f"Mean: {dataloader.mean}")
     print(f"Std: {dataloader.std}")
     y_hat = (y_hat * dataloader.std) + dataloader.mean
+    batch[1] = (batch[1] * dataloader.std) + dataloader.mean
   # compute the emissivity maps
   em, em_hat = model.calc_em(batch, y_hat)
   
@@ -165,11 +166,11 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
   diff_map = np.abs(em_map - em_hat_map)
   # plot the maps side by side
   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  im0 = axs[0].imshow(em_map, cmap='viridis', interpolation='nearest')
+  im0 = axs[0].imshow(em_hat_map, cmap='viridis', interpolation='nearest')
   axs[0].set_title("Model map")
   # plot the colorbar rescaled by 60%
   fig.colorbar(im0, ax=axs[0], shrink=0.6)
-  im1 = axs[1].imshow(em_hat_map, cmap='viridis', interpolation='nearest')
+  im1 = axs[1].imshow(em_map, cmap='viridis', interpolation='nearest')
   axs[1].set_title("Precomputed map")
   fig.colorbar(im1, ax=axs[1], shrink=0.6)
   im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
