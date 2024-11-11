@@ -7,6 +7,8 @@ from dataset import TomographyDataModule
 import config
 import matplotlib.pyplot as plt
 from scipy.special import j0, j1, jn_zeros
+from utils import compute_bessel_n_mesh
+import time
 
 def visualize():
   # Define an instance of the model
@@ -126,37 +128,92 @@ def generate_maps(dataloader, model):
     g_r_t_pc[radii > 1.0] = -10 # set the values outside the circle to -10
     return g_r_t_model/radius, g_r_t_pc/radius # return the normalized maps
 
-if __name__ == "__main__":
-  # Load the data and the model
-  datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
-  datamodule.setup()
-  val_loader = datamodule.val_dataloader()
-
-  model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  version_num = 37
-  assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
-  model.load_state_dict(torch.load(
-    f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",
-    )['state_dict'])
+def plot_maps(model, dataloader):
+  '''This function uses the calc_em function of the TomoModel class to generate
+  the emissivity maps from the coefficients. It then plots the maps side by side
+  and saves the figure as a png file.
+  '''
+  val_loader = dataloader.val_dataloader()
+  # get the batch
+  batch = next(iter(val_loader))
+  y_hat = model(batch[0])
+  # compute the emissivity maps
+  em, em_hat = model.calc_em(batch, y_hat)
   
-  # Generate the maps
-  model_map, pc_map = generate_maps(val_loader, model)
+  # return the maps
+  return em, em_hat
+
+def plot_maps_for_loop(em, em_hat, index, version_num):
+  '''This function uses the generated emissivity maps and selects just one of 
+   them through the index variable. It then plots the maps side by side and 
+   their mean squared difference. It eventually saves the figure as a png file.
+  '''
+  # select one of the maps from the batches em and em_hat
+  em_map = em[index].detach().numpy()
+  em_hat_map = em_hat[index].detach().numpy()
+  # compute the absolute difference
+  diff_map = np.abs(em_map - em_hat_map)
   # plot the maps side by side
   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  im0 = axs[0].imshow(model_map, cmap='viridis', interpolation='nearest')
+  im0 = axs[0].imshow(em_map, cmap='viridis', interpolation='nearest')
   axs[0].set_title("Model map")
   # plot the colorbar rescaled by 60%
   fig.colorbar(im0, ax=axs[0], shrink=0.6)
-
-  im1 = axs[1].imshow(pc_map, cmap='viridis', interpolation='nearest')
+  im1 = axs[1].imshow(em_hat_map, cmap='viridis', interpolation='nearest')
   axs[1].set_title("Precomputed map")
   fig.colorbar(im1, ax=axs[1], shrink=0.6)
-  # compute the difference between the two maps
-  diff_map = np.abs(model_map - pc_map)#/np.max(pc_map)
   im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
   axs[2].set_title("Difference map")
   fig.colorbar(im2, ax=axs[2], shrink=0.6)
-
   # save the figure
-  fig.savefig(f"maps_{version_num}.png")
-  plt.show()
+  fig.savefig(f"../plots/maps/version_{version_num}/maps_{index}.png")
+  plt.close()
+
+if __name__ == "__main__":
+  # # Load the data and the model
+  # datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
+  # datamodule.setup()
+  # val_loader = datamodule.val_dataloader()
+
+  # model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
+  # version_num = 37
+  # assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
+  # model.load_state_dict(torch.load(
+  #   f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",
+  #   )['state_dict'])
+  
+  # # Generate the maps
+  # model_map, pc_map = generate_maps(val_loader, model)
+  # # plot the maps side by side
+  # fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+  # im0 = axs[0].imshow(model_map, cmap='viridis', interpolation='nearest')
+  # axs[0].set_title("Model map")
+  # # plot the colorbar rescaled by 60%
+  # fig.colorbar(im0, ax=axs[0], shrink=0.6)
+
+  # im1 = axs[1].imshow(pc_map, cmap='viridis', interpolation='nearest')
+  # axs[1].set_title("Precomputed map")
+  # fig.colorbar(im1, ax=axs[1], shrink=0.6)
+  # # compute the difference between the two maps
+  # diff_map = np.abs(model_map - pc_map)#/np.max(pc_map)
+  # im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+  # axs[2].set_title("Difference map")
+  # fig.colorbar(im2, ax=axs[2], shrink=0.6)
+
+  # # save the figure
+  # fig.savefig(f"maps_{version_num}.png")
+  # plt.show()
+  start = time.time()
+  model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
+  version_num = 41
+  assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
+  model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
+
+  datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
+  datamodule.setup()
+
+  em, em_hat = plot_maps(model, datamodule)
+  stop = time.time()
+  print(f"Time elapsed: {stop - start}")
+  for i in range(32):
+    plot_maps_for_loop(em, em_hat, i, version_num)

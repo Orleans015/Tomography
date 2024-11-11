@@ -12,15 +12,15 @@ class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
     self.lr = learning_rate
-    self.layersize = 512
+    #self.layersize = 512
     self.net = nn.Sequential(
-        nn.Linear(inputsize, self.layersize),  # Define a linear layer with input size and output size
+        nn.Linear(inputsize, 128),  # Define a linear layer with input size and output size
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(self.layersize, self.layersize),  # Define another linear layer
+        nn.Linear(128, 128),  # Define another linear layer
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(self.layersize, self.layersize),  # Define another linear layer
+        nn.Linear(128, 128),  # Define another linear layer
         nn.ReLU(),  # Apply ReLU activation function
-        nn.Linear(self.layersize, outputsize)  # Define Final linear layer with output size
+        nn.Linear(128, outputsize)  # Define Final linear layer with output size
     )
     self.loss_rate = 0.2  # Define the loss rate
     self.loss_fn = nn.MSELoss()  # Define the loss function as CrossEntropyLoss

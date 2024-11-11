@@ -4,6 +4,7 @@ import os
 import config
 from scipy.interpolate import BSpline, splrep 
 from tqdm import tqdm
+from time import sleep
 
 # define a sample of an element in the database
 sample_dtype = np.dtype(
@@ -11,6 +12,7 @@ sample_dtype = np.dtype(
         ('label', np.str_, 10), # Label of the sample (ex: 30810_0140)
         ('shot', np.int32), # Shot number (ex: 30810)
         ('time', np.float32), # Time of the shot (ex: 0.0140)
+        ('prel', np.float32, (92,)), # Relative coordinates of the detectors
         ('data', np.float32, (92,)), # data in the bright struct the detectors (Line of sight)
         ('data_err', np.float32, (92,)), # error on data in the bright struct (error on line of sight)
         # Coordinates of the lines of sight, to be implemented
@@ -87,8 +89,10 @@ def read_tomography(file):
                 sample[i - k]['label'] = label
                 sample[i - k]['shot'] = shot
                 sample[i - k]['time'] = tempo
+                sample[i - k]['prel'] = datum['st']['bright'][0]['prel'][0]
                 sample[i - k]['data'] = datum['st']['bright'][0]['data'][0][i]
                 sample[i - k]['data_err'] = datum['st']['bright'][0]['err'][0][i]
+                sample[i - k]['data_err'][sample[i - k]['data_err'] == 0.] = sample[i - k]['data'][sample[i - k]['data_err'] == 0.]*0.1
                 sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
                 sample[i - k]['emiss'] = st_e['emiss'][0][i]
             else:
@@ -109,12 +113,13 @@ def read_tomography(file):
                                  datum['st_e']['err_hor'][0][i][np.argsort(datum['st_e']['prel_hor'][0])])):
                 # Augment the data to have the same number of lines of sight and brightness
                 # The underscore in the first argument is a placeholder for the lines of sight
-                _, sample[i - k]['data'], sample[i - k]['data_err'] = augment_data(
+                sample[i - k]['prel'], sample[i - k]['data'], sample[i - k]['data_err'] = augment_data(
                     datum['st']['bright'][0]['logical'][0],
                     datum['st']['bright'][0]['prel'][0],
                     datum['st']['bright'][0]['data'][0][i],
                     datum['st']['bright'][0]['err'][0][i]
-                    )        
+                    )
+                sample[i - k]['data_err'][sample[i - k]['data_err'] == 0.] = sample[i - k]['data'][sample[i - k]['data_err'] == 0.]*0.1
                 tempo = st_e['t'][0][i]
                 tt = np.rint(tempo*1e4)
                 shot = st_e['shot'][0]
@@ -192,7 +197,7 @@ def discriminate_data(x, y, yerr):
     # Compute the number of points that are at a distance less than the threshold
     n_points = np.sum(distance < threshold)
     # Check if the profile is to be kept
-    if n_points >= 0.8*len(y):
+    if n_points >= 0.*len(y):
         return True
     else:
         return False
@@ -225,5 +230,4 @@ if __name__ == "__main__":
     create_db()
     data = np.load(os.path.join(config.DATA_DIR, config.FILE_NAME))
     print(data.shape)
-    print(len(data[0]))
     
