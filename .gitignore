@@ -16,3 +16,7 @@ README.md
 /edoardo/*.csv
 /sav_files
 *.png
+*.sav
+*TB_logs*
+*__pycache__*
+*data*
