@@ -41,7 +41,7 @@ class TomoModel(L.LightningModule):
     mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.training_step_outputs.append(loss)  # Append the loss to the training step outputs list
+    self.training_step_outputs.append(loss.detach().cpu().numpy())  # Append the loss to the training step outputs list
     self.log_dict({'train_loss': loss,
                    'train_mse': mse,
                    'train_mae': mae,

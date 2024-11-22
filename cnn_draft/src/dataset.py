@@ -76,7 +76,7 @@ class TomographyDataModule(L.LightningDataModule):
     - split the dataset into training, validation, and test sets.
     '''
     # Load the dataset
-    entire_dataset = TomographyDataset(self.data_dir, self.file_name, n_samples=1000)
+    entire_dataset = TomographyDataset(self.data_dir, self.file_name, n_samples=None)
     # normalize the data but only the ones that are greater than 0
     mask_pos = entire_dataset.data > 0 # Get the data containing real values from the diagnostic
     mask_neg = entire_dataset.data < 0 # Get the data not containing real values from the diagnostic
@@ -98,6 +98,7 @@ class TomographyDataModule(L.LightningDataModule):
     return DataLoader(self.train_ds,
                       batch_size=self.batch_size,
                       num_workers=self.num_workers,
+                      pin_memory=True,
                       shuffle=True)
 
   def val_dataloader(self):
@@ -105,6 +106,7 @@ class TomographyDataModule(L.LightningDataModule):
     return DataLoader(self.val_ds,
                       batch_size=self.batch_size,
                       num_workers=self.num_workers,
+                      pin_memory=True,
                       shuffle=False)
 
   def test_dataloader(self):
@@ -112,5 +114,6 @@ class TomographyDataModule(L.LightningDataModule):
     return DataLoader(self.test_ds,
                       batch_size=self.batch_size,
                       num_workers=self.num_workers,
+                      pin_memory=True,
                       shuffle=False)
   

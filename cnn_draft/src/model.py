@@ -82,12 +82,12 @@ class TomoModel(L.LightningModule):
   
   def training_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
-    mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
+    # mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.training_step_outputs.append(loss)  # Append the loss to the training step outputs list
+    self.training_step_outputs.append(loss.detach().cpu().numpy())  # Append the loss to the training step outputs list
     self.log_dict({'train_loss': loss,
-                   'train_mse': mse,
+                  #  'train_mse': mse,
                    'train_mae': mae,
                    'train_r2': r2,
                    },
@@ -98,11 +98,11 @@ class TomoModel(L.LightningModule):
   def validation_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
     # calculate metrics
-    mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
+    # mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
     self.log_dict({'val_loss': loss,
-                   'val_mse': mse,
+                  #  'val_mse': mse,
                    'val_mae': mae,
                    'val_r2': r2,
                    },
@@ -112,11 +112,11 @@ class TomoModel(L.LightningModule):
   
   def test_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
-    mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
+    # mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
     self.log_dict({'test_loss': loss,
-                   'test_mse': mse,
+                  #  'test_mse': mse,
                    'test_mae': mae,
                    'test_r2': r2,
                    },

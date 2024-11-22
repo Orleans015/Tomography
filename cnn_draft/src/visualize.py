@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from scipy.special import j0, j1, jn_zeros
 from utils import compute_bessel_n_mesh
 import time
+# import ipywidgets as widgets
+# from IPython.display import display
 
 def visualize():
   # Define an instance of the model
@@ -181,50 +183,87 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
   plt.close()
 
 if __name__ == "__main__":
-  # # Load the data and the model
-  # datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
-  # datamodule.setup()
-  # val_loader = datamodule.val_dataloader()
-
-  # model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  # version_num = 37
-  # assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
-  # model.load_state_dict(torch.load(
-  #   f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",
-  #   )['state_dict'])
-  
-  # # Generate the maps
-  # model_map, pc_map = generate_maps(val_loader, model)
-  # # plot the maps side by side
-  # fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  # im0 = axs[0].imshow(model_map, cmap='viridis', interpolation='nearest')
-  # axs[0].set_title("Model map")
-  # # plot the colorbar rescaled by 60%
-  # fig.colorbar(im0, ax=axs[0], shrink=0.6)
-
-  # im1 = axs[1].imshow(pc_map, cmap='viridis', interpolation='nearest')
-  # axs[1].set_title("Precomputed map")
-  # fig.colorbar(im1, ax=axs[1], shrink=0.6)
-  # # compute the difference between the two maps
-  # diff_map = np.abs(model_map - pc_map)#/np.max(pc_map)
-  # im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
-  # axs[2].set_title("Difference map")
-  # fig.colorbar(im2, ax=axs[2], shrink=0.6)
-
-  # # save the figure
-  # fig.savefig(f"maps_{version_num}.png")
-  # plt.show()
-  start = time.time()
-  model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  version_num = 45
+  model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE)
+  version_num = 74
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
 
   datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
   datamodule.setup()
 
-  em, em_hat = plot_maps(model, datamodule)
-  stop = time.time()
-  print(f"Time elapsed: {stop - start}")
-  for i in range(32):
-    plot_maps_for_loop(em, em_hat, i, version_num)
+  val_loader = datamodule.val_dataloader()
+  batch = next(iter(val_loader))
+  
+  start = time.time()
+  y_hat = model(batch[0])
+  end = time.time()
+  
+  if -10 in batch[0]:
+    y_hat = (y_hat * datamodule.std) + datamodule.mean
+    batch[1] = (batch[1] * datamodule.std) + datamodule.mean
+
+  # print(f"shape of the batch: {batch[1].shape}")
+  # print(f"shape of the prediction: {y_hat.shape}")
+
+  y_hat = y_hat.reshape(-1, 110, 110)
+  batch[1] = batch[1].reshape(-1, 110, 110)
+
+  # print(f"shape of the batch: {batch[1].shape}")
+  # print(f"shape of the prediction: {y_hat.shape}")
+  
+  # generate random indices in the batch
+  indices = np.random.randint(0, len(batch[1]), 50)
+  for index in indices:
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+    im0 = axs[0].imshow(batch[1][index].detach().numpy(), cmap='viridis', interpolation='nearest')
+    axs[0].set_title("Reference map")
+    fig.colorbar(im0, ax=axs[0], shrink=0.6)
+    im1 = axs[1].imshow(y_hat[index].detach().numpy(), cmap='viridis', interpolation='nearest')
+    axs[1].set_title("Model map")
+    fig.colorbar(im1, ax=axs[1], shrink=0.6)
+    diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[index].detach().numpy())
+    im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+    axs[2].set_title("Difference map")
+    fig.colorbar(im2, ax=axs[2], shrink=0.6)
+    plt.savefig(f"results_{index}.png")
+    plt.close()
+  print(f"Time elapsed: {end - start}")
+  # # Create a slider for selecting the batch index
+  # batch_index_slider = widgets.IntSlider(min=0, max=len(batch[0])-1, step=1, description='Batch Index:')
+  # # Create a button to stop the loop
+  # stop_button = widgets.Button(description="Stop")
+
+  # # Display the slider and button
+  # display(batch_index_slider, stop_button)
+
+  # # Function to update the plots based on the selected batch index
+  # def update_plots(change):
+  #   index = batch_index_slider.value
+  #   y_hat = model(batch[0][index].unsqueeze(0))
+  #   if -10 in batch[0][index]:
+  #     y_hat = (y_hat * datamodule.std) + datamodule.mean
+  #     batch[1][index] = (batch[1][index] * datamodule.std) + datamodule.mean
+
+  #   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+  #   axs[0].imshow(batch[1][index].detach().numpy(), cmap='viridis', interpolation='nearest')
+  #   axs[0].set_title("Reference map")
+  #   axs[1].imshow(y_hat[0].detach().numpy(), cmap='viridis', interpolation='nearest')
+  #   axs[1].set_title("Model map")
+  #   diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[0].detach().numpy())
+  #   axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+  #   axs[2].set_title("Difference map")
+  #   plt.show()
+
+  # # Attach the update function to the slider
+  # batch_index_slider.observe(update_plots, names='value')
+
+  # # Function to stop the loop
+  # def stop_loop(b):
+  #   batch_index_slider.close()
+  #   stop_button.close()
+
+  # # Attach the stop function to the button
+  # stop_button.on_click(stop_loop)
+
+  # # Initial plot
+  # update_plots(None)

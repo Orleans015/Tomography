@@ -8,7 +8,7 @@ NUM_EPOCHS = 100
 # Dataset
 DATA_DIR = '../data/'
 FILE_NAME = 'data_clean.npy'
-NUM_WORKERS = 8
+NUM_WORKERS = 7
 
 # Compute related
 ACCELERATOR = 'gpu'
