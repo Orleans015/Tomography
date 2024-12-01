@@ -31,34 +31,34 @@ class TomoModel(L.LightningModule):
     # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
     # of the negative slope is 0.01.
     self.linear = nn.Sequential(
-        nn.Linear(inputsize, 2420),  # Define a linear layer with input size and output size
+        nn.Linear(inputsize, 256),  # Define a linear layer with input size and output size
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Linear(2420, 2420),  # Define another linear layer
+        nn.Linear(256, 16*11*11),  # Define another linear layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        Reshape([-1, 20, 11, 11]),  # Reshape the tensor First dimension is batch size, second dimension is the number of channels, and the last two dimensions are the height and width of the tensor
+        Reshape([-1, 16, 11, 11]),  # Reshape the tensor First dimension is batch size, second dimension is the number of channels, and the last two dimensions are the height and width of the tensor
     )
     self.anti_conv = nn.Sequential(
-        nn.ConvTranspose2d(20, 20, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(20, 20, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(16, 16, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(20, 20, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(20, 10, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(10, 10, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(16, 8, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(10, 10, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(10, 5, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(5, 5, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(8, 4, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(5, 5, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(5, 5, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(5, 5, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(4, 4, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(5, 5, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(4, 4, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(5, 1, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(4, 1, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
     )
 
     self.net = nn.Sequential(
@@ -152,112 +152,3 @@ class TomoModel(L.LightningModule):
   def configure_optimizers(self):
     return optim.Adam(self.parameters(), lr=self.lr)  # Use Adam optimizer with the specified learning rate
   
-  def calc_em(self, batch, y_hat):
-    '''
-    Compute the emissivity maps using the coefficients. The coefficients are
-    used to compute the emissivity maps using the Bessel functions. The emissivity
-    maps are then normalized and the constraints are applied.
-    '''
-    _, y, j0, j1, em, em_hat, radii, angles = batch
-    # # Print the shape of the radii and angles tensors
-    # print(f"Radii shape: {radii.shape}")
-    # print(f"Angles shape: {angles.shape}")
-
-    # Split the coefficients for all samples in the batch along the last dimension (size 7)
-    a0cl, a1cl, a1sl = torch.split(y, 7, dim=-1)
-    a0cl_hat, a1cl_hat, a1sl_hat = torch.split(y_hat, 7, dim=-1)
-    # Reshape coefficient tensors to match the dimensions of j0 and j1
-    a0cl = a0cl.unsqueeze(1).unsqueeze(1)  # Shape: [32, 1, 1, 7]
-    a1cl = a1cl.unsqueeze(1).unsqueeze(1)  # Shape: [32, 1, 1, 7]
-    a1sl = a1sl.unsqueeze(1).unsqueeze(1)  # Shape: [32, 1, 1, 7]
-    
-    a0cl_hat = a0cl_hat.unsqueeze(1).unsqueeze(1)
-    a1cl_hat = a1cl_hat.unsqueeze(1).unsqueeze(1)
-    a1sl_hat = a1sl_hat.unsqueeze(1).unsqueeze(1)
-
-    # # shape of the coefficients
-    # print(f"Shape of a0cl: {a0cl.shape}")
-    # print(f"Shape of a1cl: {a1cl.shape}")
-    # print(f"Shape of a1sl: {a1sl.shape}")
-
-    # Ensure j0, j1 are the same dtype as the coefficients
-    j0 = j0.type(a0cl.dtype)
-    j1 = j1.type(a1cl.dtype)
-    # # shape of the j0, j1 tensors
-    # print(f"Shape of j0: {j0.shape}")
-    # print(f"Shape of j1: {j1.shape}")
-    
-    # Perform dot products over the last dimension (7) using einsum
-    dot0_c = torch.einsum('bijl,bijl->bij', j0, a0cl)
-    dot1_c = torch.einsum('bijl,bijl->bij', j1, a1cl)
-    dot1_s = torch.einsum('bijl,bijl->bij', j1, a1sl)
-    # # print the shape of the dots tensors 
-    # print(f"Dot0_c shape: {dot0_c.shape}")
-    # print(f"Dot1_c shape: {dot1_c.shape}")
-    # print(f"Dot1_s shape: {dot1_s.shape}")
-
-    dot0_c_hat = torch.einsum('bijl,bijl->bij', j0, a0cl_hat)
-    dot1_c_hat = torch.einsum('bijl,bijl->bij', j1, a1cl_hat)
-    dot1_s_hat = torch.einsum('bijl,bijl->bij', j1, a1sl_hat)
-    
-    # Compute the emissivity maps for all samples in the batch
-    em = dot0_c + dot1_c * torch.cos(angles) + dot1_s * torch.sin(angles)
-    em_hat = dot0_c_hat + dot1_c_hat * torch.cos(angles) + dot1_s_hat * torch.sin(angles)
-    
-    # Apply the constraints
-    em = torch.where(em < 0, torch.tensor(0.0, dtype=em.dtype, device=em.device), em)
-    em = torch.where(radii > 1.0, torch.tensor(-10.0, dtype=em.dtype, device=em.device), em)
-    
-    em_hat = torch.where(em_hat < 0, torch.tensor(0.0, dtype=em_hat.dtype, device=em_hat.device), em_hat)
-    em_hat = torch.where(radii > 1.0, torch.tensor(-10.0, dtype=em_hat.dtype, device=em_hat.device), em_hat)
-    
-    # Normalize the maps
-    em = em / 0.459
-    em_hat = em_hat / 0.459
-    
-    return em, em_hat
-
-  # This is the same function as above but implemented using a for loop over the
-  # samples in the batch! The above implementation is more efficient as it uses
-  # einsum to perform the dot products over the last dimension of the tensors.
-  # Or at least, it is more efficient on the memory side, as it does not require
-  # to store the intermediate results of the dot products for each sample in the
-  # batch. But it is not clear if it is more efficient in terms of computation time.
-  # The for loop implementation is more readable and easier to understand.
-  def calc_em_for_loop(self, batch, y_hat):
-    _, y, j0, j1, em, em_hat, radii, angles = batch
-    em_list = []
-    em_hat_list = []
-    for index in range(len(y)):
-      # compute the map from the data
-      a0cl, a1cl, a1sl = torch.split(y[index], 7)
-      # change the j0, j1 to the same type as the coefficients
-      j0 = j0.type(a0cl.dtype)
-      j1 = j1.type(a1cl.dtype)
-      # perform the dot product
-      dot0_c = torch.matmul(j0, a0cl)
-      dot1_c = torch.matmul(j1, a1cl)
-      dot1_s = torch.matmul(j1, a1sl) 
-      # finally compute the emissivity map
-      em = dot0_c + dot1_c * torch.cos(angles) + dot1_s * torch.sin(angles)
-      em[em < 0] = 0 # get rid of negative values (unphysical)
-      em[radii > 1.0] = -10 # get the values outside the circle to -10
-
-      # compute the map from the model
-      a0cl_hat, a1cl_hat, a1sl_hat = torch.split(y_hat[index], 7)
-      # change the j0, j1 to the same type as the coefficients
-      j0 = j0.type(a0cl_hat.dtype)
-      j1 = j1.type(a0cl_hat.dtype)
-      # perform the dot product
-      dot0_c_hat = torch.matmul(j0, a0cl_hat)
-      dot1_c_hat = torch.matmul(j1, a1cl_hat)
-      dot1_s_hat = torch.matmul(j1, a1sl_hat)
-      # finally compute the emissivity map
-      em_hat = dot0_c_hat + dot1_c_hat * torch.cos(angles) + dot1_s_hat * torch.sin(angles)
-      em_hat[em < 0] = 0 # get rid of negative values (unphysical)
-      em_hat[radii > 1.0] = -10 # set the values outside the circle to -10
-
-      em_list.append(em / 0.459)
-      em_hat_list.append(em_hat / 0.459)
-
-    return torch.stack(em_list), torch.stack(em_hat_list) # return the normalized maps

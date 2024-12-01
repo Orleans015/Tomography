@@ -1,10 +1,6 @@
-import os
 from scipy.special import j0, j1, jn_zeros
 import numpy as np
 import lightning as L
-import torch
-import config
-from dataset import TomographyDataset
 
 def compute_bessel_n_mesh(minr, majr, x_grid, y_grid):
   # set relative coordinates

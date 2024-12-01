@@ -184,7 +184,7 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
 
 if __name__ == "__main__":
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE)
-  version_num = 74
+  version_num = 77 # version number of the model (74 the big one)
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
 
@@ -215,14 +215,14 @@ if __name__ == "__main__":
   indices = np.random.randint(0, len(batch[1]), 50)
   for index in indices:
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-    im0 = axs[0].imshow(batch[1][index].detach().numpy(), cmap='viridis', interpolation='nearest')
+    im0 = axs[0].imshow(batch[1][index].detach().numpy(), cmap='inferno', interpolation='nearest')
     axs[0].set_title("Reference map")
     fig.colorbar(im0, ax=axs[0], shrink=0.6)
-    im1 = axs[1].imshow(y_hat[index].detach().numpy(), cmap='viridis', interpolation='nearest')
+    im1 = axs[1].imshow(y_hat[index].detach().numpy(), cmap='inferno', interpolation='nearest')
     axs[1].set_title("Model map")
     fig.colorbar(im1, ax=axs[1], shrink=0.6)
     diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[index].detach().numpy())
-    im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+    im2 = axs[2].imshow(diff_map, cmap='inferno', interpolation='nearest')
     axs[2].set_title("Difference map")
     fig.colorbar(im2, ax=axs[2], shrink=0.6)
     plt.savefig(f"results_{index}.png")
