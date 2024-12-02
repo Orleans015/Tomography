@@ -285,15 +285,15 @@ def train_function(config):
     trainer.fit(model, datamodule=dm)
 
 search_space = {
-    "hidden_layer1_size": tune.choice([256, 512, 1024]),
-    "hidden_layer2_size": tune.choice([256, 512, 1024]),
-    "hidden_layer3_size": tune.choice([256, 512, 1024]),
-    "lr" : tune.loguniform(1e-4, 1e-2),
-    "batch_size": tune.choice([32, 64, 128]),
+    "hidden_layer1_size": tune.choice([32, 64, 128]),
+    "hidden_layer2_size": tune.choice([32, 64, 128]),
+    "hidden_layer3_size": tune.choice([32, 64, 128]),
+    "lr" : tune.loguniform(5e-5, 1e-2),
+    "batch_size": tune.choice([16, 32, 64, 128, 256]),
 }
 
 num_epochs = 20
-num_samples = 50
+num_samples = 100
 
 # scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
 
@@ -337,4 +337,5 @@ if __name__ == "__main__":
     results = tune_tomo_asha(num_samples=num_samples)
     best_trial = results.get_best_result("val_loss", "min", "last")
     print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(best_trial.last_result["val_loss"]))
+
+# Best trial config: {'train_loop_config': {'hidden_layer1_size': 1024, 'hidden_layer2_size': 1024, 'hidden_layer3_size': 128, 'lr': 7.864154774069017e-05, 'batch_size': 32}}

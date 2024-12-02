@@ -197,7 +197,7 @@ def discriminate_data(x, y, yerr):
     # Compute the number of points that are at a distance less than the threshold
     n_points = np.sum(distance < threshold)
     # Check if the profile is to be kept
-    if n_points >= 0.*len(y):
+    if n_points >= 0.8*len(y): # Treshold to clean the data
         return True
     else:
         return False
