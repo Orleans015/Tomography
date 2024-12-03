@@ -8,18 +8,26 @@ from torch.utils.data import DataLoader, random_split, Subset
 from torchmetrics import Accuracy
 from torchvision.datasets import MNIST
 from torchvision import transforms
-
-import pytorch_lightning as pl
-from pytorch_lightning import trainer
-from pytorch_lightning.loggers.csv_logs import CSVLogger
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
 import lightning as L
-from scipy.special import j0, j1, jn_zeros
-import utils
+
+# Training hyperparameters
+INPUTSIZE = 92
+OUTPUTSIZE = (110, 110)
+LEARNING_RATE = 3e-4
+BATCH_SIZE = 128
+NUM_EPOCHS = 100
+
+# Dataset
+DATA_DIR = '../data/'
+FILE_NAME = 'data_clean.npy'
+NUM_WORKERS = 1
+
+# Compute related
+ACCELERATOR = 'gpu'
+DEVICES = [0]
+PRECISION = '16-mixed'
 
 class Reshape(nn.Module):
   def __init__(self, shape):

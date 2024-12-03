@@ -1,3 +1,51 @@
+"""
+This script trains a neural network model for tomography using PyTorch Lightning and Ray Tune for hyperparameter tuning.
+Constants:
+  INPUTSIZE (int): Size of the input layer.
+  OUTPUTSIZE (int): Size of the output layer.
+  LEARNING_RATE (float): Learning rate for the optimizer.
+  BATCH_SIZE (int): Batch size for training.
+  NUM_EPOCHS (int): Number of epochs for training.
+  DATA_DIR (str): Directory where the dataset is stored.
+  FILE_NAME (str): Name of the dataset file.
+  NUM_WORKERS (int): Number of workers for data loading.
+  ACCELERATOR (str): Type of accelerator to use ('gpu' or 'cpu').
+  DEVICES (list): List of device IDs to use for training.
+  PRECISION (str): Precision type for training ('16-mixed' or '32').
+Classes:
+  TomoModel(L.LightningModule):
+    A PyTorch Lightning module defining the neural network model for tomography.
+    Methods:
+      __init__(self, inputsize, outputsize, config): Initializes the model with given input size, output size, and configuration.
+      forward(self, x): Defines the forward pass of the model.
+      training_step(self, batch, batch_idx): Defines the training step.
+      validation_step(self, batch, batch_idx): Defines the validation step.
+      test_step(self, batch, batch_idx): Defines the test step.
+      _common_step(self, batch, batch_idx): Common step for training, validation, and test steps.
+      predict_step(self, batch, batch_idx): Defines the prediction step.
+      configure_optimizers(self): Configures the optimizer for training.
+  TomographyDataset(torch.utils.data.Dataset):
+    A custom dataset class for tomography data.
+    Methods:
+      __init__(self, data_dir, file_name): Initializes the dataset with given data directory and file name.
+      __len__(self): Returns the length of the dataset.
+      __getitem__(self, idx): Returns the data and target for the given index.
+  TomographyDataModule(L.LightningDataModule):
+    A PyTorch Lightning data module for handling data loading and preprocessing.
+    Methods:
+      __init__(self, data_dir, file_name, batch_size, num_workers=4): Initializes the data module with given parameters.
+      prepare_data(self): Prepares the data (e.g., downloads, IO).
+      setup(self, stage=None): Sets up the dataset and splits it into training, validation, and test sets.
+      train_dataloader(self): Returns the train dataloader.
+      val_dataloader(self): Returns the validation dataloader.
+      test_dataloader(self): Returns the test dataloader.
+Functions:
+  train_function(config): Trains the model with the given configuration.
+  tune_tomo_asha(num_samples=10): Tunes the model using ASHA scheduler with the given number of samples.
+Usage:
+  Run the script to train and tune the tomography model. The best trial configuration will be printed at the end.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,7 +72,7 @@ NUM_EPOCHS = 100
 # Dataset
 DATA_DIR = '/home/orlandi/devel/Tomography/tomo-rfx/Draft_model/data/'
 FILE_NAME = 'data_clean.npy'
-NUM_WORKERS = 8
+NUM_WORKERS = 1
 
 # Compute related
 ACCELERATOR = 'gpu'
@@ -69,13 +117,12 @@ class TomoModel(L.LightningModule):
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
     self.training_step_outputs.append(loss.detach().cpu().numpy())  # Append the loss to the training step outputs list
-    self.log_dict({'train_loss': loss,
-                   'train_mse': mse,
-                   'train_mae': mae,
-                   'train_r2': r2,
-                   'sync_dist': True,
+    self.log_dict({'train_loss': loss.item(),
+                   'train_mse': mse.item(),
+                   'train_mae': mae.item(),
+                   'train_r2': r2.item(),
                    },
-                   on_step=False, on_epoch=True, prog_bar=False
+                   on_step=False, on_epoch=True, prog_bar=False, sync_dist=True,
                    )  # Log the training loss, mae, and F1 score
     return {"loss": loss, "preds": y_hat, "target": y}
   
@@ -85,13 +132,12 @@ class TomoModel(L.LightningModule):
     mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.log_dict({'val_loss': loss,
-                   'val_mse': mse,
-                   'val_mae': mae,
-                   'val_r2': r2,
-                   'sync_dist': True,
+    self.log_dict({'val_loss': loss.item(),
+                   'val_mse': mse.item(),
+                   'val_mae': mae.item(),
+                   'val_r2': r2.item(),
                    },
-                   on_step=False, on_epoch=True, prog_bar=False
+                   on_step=False, on_epoch=True, prog_bar=False, sync_dist=True,
                    )  # Log the validation loss, mae, and F1 score
     return loss
   
@@ -100,13 +146,12 @@ class TomoModel(L.LightningModule):
     mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.log_dict({'test_loss': loss,
-                   'test_mse': mse,
-                   'test_mae': mae,
-                   'test_r2': r2,
-                   'sync_dist': True,
+    self.log_dict({'test_loss': loss.item(),
+                   'test_mse': mse.item(),
+                   'test_mae': mae.item(),
+                   'test_r2': r2.item(),
                    },
-                   on_step=False, on_epoch=True, prog_bar=False
+                   on_step=False, on_epoch=True, prog_bar=False, sync_dist=True,
                    )  # Log the test loss, mae, and F1 score
     return loss
   
@@ -283,6 +328,8 @@ def train_function(config):
 
     trainer = prepare_trainer(trainer)
     trainer.fit(model, datamodule=dm)
+    # free up memory
+    torch.cuda.empty_cache() 
 
 search_space = {
     "hidden_layer1_size": tune.choice([32, 64, 128]),
@@ -299,7 +346,7 @@ num_samples = 100
 
 # The following code is to be implemented if training on multiple GPUs
 scaling_config = ScalingConfig(
-    num_workers=1,
+    num_workers=NUM_WORKERS,
     use_gpu=True,
     resources_per_worker={"CPU": 1, "GPU": 1}
 )
@@ -329,9 +376,10 @@ def tune_tomo_asha(num_samples=10):
             mode="min",
             num_samples=num_samples,
             scheduler=scheduler,
+            reuse_actors=True,
         ),
     )
-    return tuner.fit()
+    return tuner.fit().detach().cpu().numpy()
 
 if __name__ == "__main__":
     results = tune_tomo_asha(num_samples=num_samples)
@@ -339,3 +387,17 @@ if __name__ == "__main__":
     print("Best trial config: {}".format(best_trial.config))
 
 # Best trial config: {'train_loop_config': {'hidden_layer1_size': 1024, 'hidden_layer2_size': 1024, 'hidden_layer3_size': 128, 'lr': 7.864154774069017e-05, 'batch_size': 32}}
+# Best trial config: {'train_loop_config': {'hidden_layer1_size': 128, 'hidden_layer2_size': 128, 'hidden_layer3_size': 64, 'lr': 0.0007161828745332463, 'batch_size': 64}}
+'''
+    To retry a failed tune run, you can then do
+
+    .. code-block:: python
+
+        tuner = Tuner.restore(results.experiment_path, trainable=trainer)
+        tuner.fit()
+
+    ``results.experiment_path`` can be retrieved from the
+    :ref:`ResultGrid object <tune-analysis-docs>`. It can
+    also be easily seen in the log output from your first run.
+
+'''
