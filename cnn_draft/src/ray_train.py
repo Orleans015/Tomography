@@ -27,7 +27,7 @@ BATCH_SIZE = 128
 NUM_EPOCHS = 100
 
 # Dataset
-DATA_DIR = '../data/'
+DATA_DIR = "/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/"
 FILE_NAME = 'data_clean.npy'
 NUM_WORKERS = 1
 
@@ -37,7 +37,13 @@ DEVICES = [0]
 PRECISION = '16-mixed'
 
 default_config = {
-  
+  "batch_size": 128,
+  "learning_rate": 3e-4,
+  "linear_size_1": 256,
+  "tcnn_size_1": 16,
+  "tcnn_size_2": 8,
+  "tcnn_size_3": 4,
+  "tcnn_size_4": 4,
 }
 
 class Reshape(nn.Module):
@@ -49,41 +55,41 @@ class Reshape(nn.Module):
     return x.view(*self.shape)
   
 class TomoModel(L.LightningModule):
-  def __init__(self, inputsize, learning_rate):
+  def __init__(self, inputsize, config=default_config):
     super().__init__()
-    self.lr = learning_rate
+    self.lr = config["learning_rate"]
     # Leaky ReLU activation function takes as argument the negative slope of the
     # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
     # of the negative slope is 0.01.
     self.linear = nn.Sequential(
-        nn.Linear(inputsize, 256),  # Define a linear layer with input size and output size
+        nn.Linear(inputsize, config["linear_size_1"]),  # Define a linear layer with input size and output size
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Linear(256, 16*11*11),  # Define another linear layer
+        nn.Linear(config["linear_size_1"], config["tcnn_size_1"]*11*11),  # Define another linear layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        Reshape([-1, 16, 11, 11]),  # Reshape the tensor First dimension is batch size, second dimension is the number of channels, and the last two dimensions are the height and width of the tensor
+        Reshape([-1, config["tcnn_size_1"], 11, 11]),  # Reshape the tensor First dimension is batch size, second dimension is the number of channels, and the last two dimensions are the height and width of the tensor
     )
     self.anti_conv = nn.Sequential(
-        nn.ConvTranspose2d(16, 16, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(config["tcnn_size_1"], config["tcnn_size_1"], kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(config["tcnn_size_1"], config["tcnn_size_1"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(config["tcnn_size_1"], config["tcnn_size_1"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(16, 8, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(config["tcnn_size_1"], config["tcnn_size_2"], kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(config["tcnn_size_2"], config["tcnn_size_2"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(config["tcnn_size_2"], config["tcnn_size_2"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(8, 4, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(config["tcnn_size_2"], config["tcnn_size_3"], kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(config["tcnn_size_3"], config["tcnn_size_3"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(config["tcnn_size_3"], config["tcnn_size_3"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(4, 4, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(config["tcnn_size_3"], config["tcnn_size_4"], kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(config["tcnn_size_4"], config["tcnn_size_4"], kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(4, 4, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(config["tcnn_size_4"], config["tcnn_size_4"], kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(4, 1, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(config["tcnn_size_4"], 1, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
     )
 
     self.net = nn.Sequential(
@@ -122,7 +128,7 @@ class TomoModel(L.LightningModule):
   
   def validation_step(self, batch, batch_idx):
     loss, y_hat, y = self._common_step(batch, batch_idx)  # Compute loss, y_hat (prediction), and target using a common step function
-    # calculate metrics
+    # calculate metricsconfig["tcnn_size_4"]
     # mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
@@ -296,7 +302,6 @@ def train_function(config):
 
     model = TomoModel(
         inputsize=INPUTSIZE,
-        outputsize=OUTPUTSIZE,
         config=config,
     )
 
@@ -314,10 +319,17 @@ def train_function(config):
 
     trainer = prepare_trainer(trainer)
     trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
     # free up memory
 
 search_space = {
-
+    "batch_size": tune.choice([16, 32, 64, 128, 256]),
+    "learning_rate": tune.loguniform(5e-5, 1e-2),
+    "linear_size_1": tune.choice([32, 64, 128, 256, 512]),
+    "tcnn_size_1": tune.choice([2, 4, 8, 16, 32]),
+    "tcnn_size_2": tune.choice([2, 4, 8, 16, 32]),
+    "tcnn_size_3": tune.choice([2, 4, 8, 16, 32]),
+    "tcnn_size_4": tune.choice([2, 4, 8, 16, 32]),
 }
 
 num_epochs = 10
@@ -333,6 +345,8 @@ scaling_config = ScalingConfig(
 )
 
 run_config = RunConfig(
+    name="cnn_asha",
+    storage_path="~/ray_results/cnn",
     checkpoint_config=CheckpointConfig(
         num_to_keep=2,
         checkpoint_score_attribute="val_loss",

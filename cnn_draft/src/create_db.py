@@ -47,7 +47,7 @@ def maximum_los():
     maximum number of lines of sight in the database
     '''
     # Maximum number of lines of sight
-    dir = "/home/orleans/projects/Tomography/Data/sav_files/"
+    dir = "/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/sav_files/"
     n_max = 0
     for file in os.listdir(dir):
         if file.endswith('.sav'):
@@ -60,7 +60,7 @@ def maximum_los():
 
 
 def read_tomography(file): 
-    dir = "../data/sav_files/"
+    dir = "/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/sav_files/"
     # Load the data from the .sav file
     try:
         datum = readsav(dir + file)
@@ -171,7 +171,7 @@ def augment_data(logical_array, prel_array, data_array, error_array):
     return np.array(new_prel), np.array(new_data), np.array(new_error)
 
 def get_coefficients(file):
-    dir = "/home/orleans/projects/Tomography/Data/"
+    dir = "/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/"
     filename = os.join(dir, file)
     data = np.load(filename)
     # Now I have to compute the coefficients for each time instant in the .npy file
