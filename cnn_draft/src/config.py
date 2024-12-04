@@ -6,7 +6,7 @@ BATCH_SIZE = 128
 NUM_EPOCHS = 100
 
 # Dataset
-DATA_DIR = '../data/'
+DATA_DIR = '/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/'
 FILE_NAME = 'data_clean.npy'
 NUM_WORKERS = 7
 

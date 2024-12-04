@@ -79,24 +79,36 @@ ACCELERATOR = 'gpu'
 DEVICES = [0]
 PRECISION = '16-mixed'
 
+  
+default_config = {
+    "hidden_layer1_size": 256,
+    "hidden_layer2_size": 256,
+    "hidden_layer3_size": 256,
+    "lr": 1e-3,
+    "batch_size": 128,
+    "activation_function": nn.LeakyReLU(),
+}
+
+
 # Define the model class
 class TomoModel(L.LightningModule):
-  def __init__(self, inputsize, outputsize, config):
+  def __init__(self, inputsize, outputsize, config=default_config):
     super().__init__()
     self.lr = config["lr"]  # Define the learning rate
     self.hidden_layer1_size = config["hidden_layer1_size"]  # Define the size of the first hidden layer
     self.hidden_layer2_size = config["hidden_layer2_size"]  # Define the size of the second hidden layer
     self.hidden_layer3_size = config["hidden_layer3_size"]  # Define the size of the third hidden layer
+    self.activation_function = config["activation_function"]  # Define the activation function
     # Leaky ReLU activation function takes as argument the negative slope of the
     # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
     # of the negative slope is 0.01.
     self.net = nn.Sequential(
         nn.Linear(inputsize, self.hidden_layer1_size),  # Define a linear layer with input size and output size
-        nn.LeakyReLU(),  # Apply ReLU activation function
+        self.activation_function,  # Apply ReLU activation function
         nn.Linear(self.hidden_layer1_size, self.hidden_layer2_size),  # Define another linear layer
-        nn.LeakyReLU(),  # Apply ReLU activation function
+        self.activation_function,  # Apply ReLU activation function
         nn.Linear(self.hidden_layer2_size, self.hidden_layer3_size),  # Define another linear layer
-        nn.LeakyReLU(),  # Apply ReLU activation function
+        self.activation_function,  # Apply ReLU activation function
         nn.Linear(self.hidden_layer3_size, outputsize)  # Define Final linear layer with output size
     )
     self.loss_rate = 0.2  # Define the loss rate
@@ -291,14 +303,6 @@ class TomographyDataModule(L.LightningDataModule):
                       batch_size=self.batch_size,
                       num_workers=self.num_workers,
                       shuffle=False)
-  
-default_config = {
-    "hidden_layer1_size": 256,
-    "hidden_layer2_size": 256,
-    "hidden_layer3_size": 256,
-    "lr": 1e-3,
-}
-
 
 def train_function(config):
     dm = TomographyDataModule(
@@ -332,15 +336,16 @@ def train_function(config):
     torch.cuda.empty_cache() 
 
 search_space = {
-    "hidden_layer1_size": tune.choice([32, 64, 128]),
-    "hidden_layer2_size": tune.choice([32, 64, 128]),
-    "hidden_layer3_size": tune.choice([32, 64, 128]),
+    "hidden_layer1_size": tune.choice([32, 64, 128, 256, 512]),
+    "hidden_layer2_size": tune.choice([32, 64, 128, 256, 512]),
+    "hidden_layer3_size": tune.choice([32, 64, 128, 256, 512]),
     "lr" : tune.loguniform(5e-5, 1e-2),
     "batch_size": tune.choice([16, 32, 64, 128, 256]),
+    "activation_function": tune.choice([nn.ReLU(), nn.LeakyReLU(), nn.Sigmoid(), nn.Tanh()]),
 }
 
-num_epochs = 20
-num_samples = 100
+num_epochs = 10
+num_samples = 300
 
 # scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
 
@@ -379,7 +384,7 @@ def tune_tomo_asha(num_samples=10):
             reuse_actors=True,
         ),
     )
-    return tuner.fit().detach().cpu().numpy()
+    return tuner.fit()
 
 if __name__ == "__main__":
     results = tune_tomo_asha(num_samples=num_samples)

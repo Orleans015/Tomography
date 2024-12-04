@@ -209,7 +209,7 @@ def create_db():
     directory and saves them in a .npy file named data.npy
     '''
     data_dir = config.DATA_DIR
-    dir = '../data/sav_files/'
+    dir = 'home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/sav_files/'
     file = config.FILE_NAME
     if os.path.exists(data_dir + file):
         return 
