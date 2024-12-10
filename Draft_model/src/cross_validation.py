@@ -59,7 +59,7 @@ import signal
 import gc
 from tqdm import tqdm
 import torch.utils
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 from torch.utils.tensorboard import SummaryWriter
 from lightning.pytorch.loggers import TensorBoardLogger
 from ray import tune
@@ -67,7 +67,12 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.train import RunConfig, ScalingConfig, CheckpointConfig
 from ray.train.torch import TorchTrainer
 from ray.train.lightning import RayDDPStrategy, RayLightningEnvironment, RayTrainReportCallback, prepare_trainer
+from lightning.fabric import Fabric, seed_everything
+from sklearn.model_selection import KFold
 
+from callbacks import SaveBest, PrintingCallback
+
+# Constants
 INPUTSIZE = 92
 OUTPUTSIZE = 21
 LEARNING_RATE = 3e-4
@@ -77,7 +82,7 @@ NUM_EPOCHS = 100
 # Dataset
 DATA_DIR = '/home/orlandi/devel/Tomography/tomo-rfx/Draft_model/data/'
 FILE_NAME = 'data_clean.npy'
-NUM_WORKERS = 1
+NUM_WORKERS = 7
 
 # Compute related
 ACCELERATOR = 'gpu'
@@ -86,11 +91,11 @@ PRECISION = '16-mixed'
 
   
 default_config = {
-    "hidden_layer1_size": 256,
-    "hidden_layer2_size": 256,
-    "hidden_layer3_size": 256,
-    "lr": 1e-3,
-    "batch_size": 128,
+    "hidden_layer1_size": 128,
+    "hidden_layer2_size": 128,
+    "hidden_layer3_size": 64,
+    "lr": 7e-4,
+    "batch_size": 64,
     "activation_function": nn.LeakyReLU(),
 }
 
@@ -310,117 +315,71 @@ class TomographyDataModule(L.LightningDataModule):
                       shuffle=False)
 
 def train_function(config):
-    logger = TensorBoardLogger("TB_logs", name="Ray_logs")
+    logger = TensorBoardLogger("TB_logs", name="CV_Tomo_model")
 
-    dm = TomographyDataModule(
-        data_dir=DATA_DIR,
-        file_name=FILE_NAME,
-        batch_size=config["batch_size"],
-        num_workers=NUM_WORKERS,
-    )
+    dataset = TomographyDataset(DATA_DIR, FILE_NAME)
 
-    model = TomoModel(
-        inputsize=INPUTSIZE,
-        outputsize=OUTPUTSIZE,
-        config=config,
-    )
+    kfolds = 5
 
-    trainer = L.Trainer(
-        logger=logger,
-        accelerator="auto",
-        devices="auto",
-        strategy=RayDDPStrategy(),
-        precision=PRECISION,
-        callbacks=[
-            RayTrainReportCallback(),
-        ],
-        plugins=RayLightningEnvironment(),
-        enable_progress_bar=False,
-    )
+    kf = KFold(n_splits=kfolds, shuffle=True, random_state=42)
 
-    trainer = prepare_trainer(trainer)
-    trainer.fit(model, datamodule=dm)
-    # free up memory
-    model.to("cpu")
-    del model
-    dm.to("cpu")
-    del dm
-    trainer.to("cpu")
-    del trainer
-    gc.collect()
-    torch.cuda.empty_cache()
+    for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)):
+        print(f"Fold {fold + 1}")
+        print("-"*15)
 
-search_space = {
-    "hidden_layer1_size": tune.choice([32, 64, 128, 256, 512]),
-    "hidden_layer2_size": tune.choice([32, 64, 128, 256, 512]),
-    "hidden_layer3_size": tune.choice([32, 64, 128, 256, 512]),
-    "lr" : tune.loguniform(5e-5, 1e-2),
-    "batch_size": tune.choice([16, 32, 64, 128, 256]),
-    "activation_function": tune.choice([nn.ReLU(), nn.LeakyReLU(), nn.Sigmoid(), nn.Tanh()]),
-}
+        # create data subsets
+        train_subset = Subset(dataset, train_idx)
+        val_subset = Subset(dataset, val_idx)
 
-num_epochs = 10
-num_samples = 200
+        # Create DataLoaders
+        train_loader = DataLoader(train_subset, batch_size=config["batch_size"], num_workers=NUM_WORKERS)
+        val_loader = DataLoader(val_subset, batch_size=config["batch_size"],  num_workers=NUM_WORKERS)
 
-# scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
+        model = TomoModel(
+            inputsize=INPUTSIZE,
+            outputsize=OUTPUTSIZE,
+            config=config,
+        )
 
-# The following code is to be implemented if training on multiple GPUs
-scaling_config = ScalingConfig(
-    num_workers=NUM_WORKERS,
-    use_gpu=True,
-    resources_per_worker={"CPU": 1, "GPU": 1}
-)
+        trainer = L.Trainer(
+            logger=logger,
+            accelerator="gpu",
+            devices=[0],
+            min_epochs=1,
+            max_epochs=NUM_EPOCHS,
+            precision=PRECISION,
+            callbacks=[
+                PrintingCallback(),
+                SaveBest(monitor="val_loss", logger=logger),
+            ],
+            enable_progress_bar=True,
+        )
 
-run_config = RunConfig(
-    name="tomo_asha",
-    storage_path="~/ray_results/regression",
-    checkpoint_config=CheckpointConfig(
-        num_to_keep=2,
-        checkpoint_score_attribute="val_loss",
-        checkpoint_score_order="min",
-    ),
-)
-
-ray_trainer = TorchTrainer(
-    train_function,
-    scaling_config=scaling_config,
-    run_config=run_config,
-)
-
-def tune_tomo_asha(num_samples=10):
-    scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
-
-    tuner = tune.Tuner(
-        ray_trainer,
-        param_space={"train_loop_config": search_space},
-        tune_config=tune.TuneConfig(
-            metric="val_loss",
-            mode="min",
-            num_samples=num_samples,
-            scheduler=scheduler,
-            reuse_actors=True,
-        ),
-    )
-    return tuner.fit()
+        trainer.fit(model, train_loader, val_loader)
 
 if __name__ == "__main__":
-    results = tune_tomo_asha(num_samples=num_samples)
-    best_trial = results.get_best_result("val_loss", "min", "last")
-    print("Best trial config: {}".format(best_trial.config))
+  train_function(default_config)
 
 # Best trial config: {'train_loop_config': {'hidden_layer1_size': 1024, 'hidden_layer2_size': 1024, 'hidden_layer3_size': 128, 'lr': 7.864154774069017e-05, 'batch_size': 32}}
 # Best trial config: {'train_loop_config': {'hidden_layer1_size': 128, 'hidden_layer2_size': 128, 'hidden_layer3_size': 64, 'lr': 0.0007161828745332463, 'batch_size': 64}}
-# Best trial config: {'train_loop_config': {'hidden_layer1_size': 32, 'hidden_layer2_size': 512, 'hidden_layer3_size': 256, 'lr': 0.004521594901917993, 'batch_size': 64, 'activation_function': ReLU()}}
 '''
-    To retry a failed tune run, you can then do
-
-    .. code-block:: python
-
-        tuner = Tuner.restore(results.experiment_path, trainable=trainer)
-        tuner.fit()
-
-    ``results.experiment_path`` can be retrieved from the
-    :ref:`ResultGrid object <tune-analysis-docs>`. It can
-    also be easily seen in the log output from your first run.
-
-'''
+Fold 1
+---------------
+Average validation loss: 3.017753839492798
+Average validation accuracy: 0.9640141725540161
+Fold 2
+---------------
+Average validation loss: 2.9337682723999023
+Average validation accuracy: 0.9643585681915283
+Fold 3
+---------------
+Average validation loss: 2.9943835735321045
+Average validation accuracy: 0.9624007940292358
+Fold 4
+---------------
+Average validation loss: 2.8547914028167725
+Average validation accuracy: 0.9633660912513733
+Fold 5
+---------------
+Average validation loss: 3.023435354232788
+Average validation accuracy: 0.9632417559623718'''

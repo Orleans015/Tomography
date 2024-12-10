@@ -9,6 +9,8 @@ from lightning.pytorch.loggers import TensorBoardLogger
 class PrintingCallback(Callback):
   def __init__(self) -> None:
     super().__init__()
+    self.val_loss = []
+    self.val_accuracy = []
   
   def on_train_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
     print("Training is starting!")
@@ -16,7 +18,20 @@ class PrintingCallback(Callback):
 
   def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
     print("Training is done!")
+    # give a summary of the los functionand accuracy
+    print(f"training loss: {trainer.callback_metrics['train_loss']}")
+    print(f"training accuracy: {trainer.callback_metrics['train_r2']}")
     return super().on_train_end(trainer, pl_module)
+  
+  def on_validation_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+    # print(f"Validation loss: {trainer.callback_metrics['val_loss']}")
+    self.val_loss.append(trainer.callback_metrics['val_loss'])
+    # print(f"Validation accuracy: {trainer.callback_metrics['val_r2']}")
+    self.val_accuracy.append(trainer.callback_metrics['val_r2'])
+    if len(self.val_loss) == 100:
+      print(f"Average validation loss: {sum(self.val_loss)/len(self.val_loss)}")
+      print(f"Average validation accuracy: {sum(self.val_accuracy)/len(self.val_accuracy)}")      
+    return super().on_validation_end(trainer, pl_module)
   
 # Save the best model based on the validation loss, the following callback should
 # be used in the Trainer callbacks list, it should check the validation loss value,

@@ -1,4 +1,5 @@
 import os
+import gc
 import numpy as np
 import random
 import torch
@@ -24,7 +25,7 @@ INPUTSIZE = 92
 OUTPUTSIZE = (110, 110)
 LEARNING_RATE = 3e-4
 BATCH_SIZE = 128
-NUM_EPOCHS = 100
+NUM_EPOCHS = 10
 
 # Dataset
 DATA_DIR = "/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/"
@@ -310,6 +311,7 @@ def train_function(config):
         devices="auto",
         strategy=RayDDPStrategy(),
         precision=PRECISION,
+        max_epochs=NUM_EPOCHS,
         callbacks=[
             RayTrainReportCallback(),
         ],
@@ -321,6 +323,14 @@ def train_function(config):
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
     # free up memory
+    model.to("cpu")
+    del model
+    dm.to("cpu")
+    del dm
+    trainer.to("cpu")
+    del trainer
+    gc.collect()
+    torch.cuda.empty_cache()
 
 search_space = {
     "batch_size": tune.choice([16, 32, 64, 128, 256]),
@@ -332,8 +342,7 @@ search_space = {
     "tcnn_size_4": tune.choice([2, 4, 8, 16, 32]),
 }
 
-num_epochs = 10
-num_samples = 300
+num_samples = 1000
 
 # scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
 
@@ -361,7 +370,7 @@ ray_trainer = TorchTrainer(
 )
 
 def tune_tomo_asha(num_samples=10):
-    scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
+    scheduler = ASHAScheduler(max_t=NUM_EPOCHS, grace_period=1, reduction_factor=2)
 
     tuner = tune.Tuner(
         ray_trainer,
