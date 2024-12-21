@@ -4,10 +4,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
 import lightning as L
-from scipy.special import j0, j1, jn_zeros
-import utils
 
-
+# hidden_layer1_size': 128, 'hidden_layer2_size': 128, 'hidden_layer3_size': 64, 'lr': 0.0007161828745332463, 'batch_size': 64}}
 class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
@@ -25,7 +23,7 @@ class TomoModel(L.LightningModule):
         nn.Linear(128, outputsize)  # Define Final linear layer with output size
     )
     self.loss_rate = 0.2  # Define the loss rate
-    self.loss_fn = nn.L1Loss()  # Define the loss function as CrossEntropyLoss
+    self.loss_fn = nn.MSELoss()#nn.L1Loss()  # Define the loss function as CrossEntropyLoss
     self.best_val_loss = torch.tensor(float('inf'))  # Initialize the best validation loss
     self.mse = torchmetrics.MeanSquaredError()  # Define Mean Squared Error metric
     self.mae = torchmetrics.MeanAbsoluteError() # Define Root Mean Squared Error metric

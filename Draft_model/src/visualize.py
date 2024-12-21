@@ -173,8 +173,8 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
   im1 = axs[1].imshow(em_map, cmap='viridis', interpolation='nearest')
   axs[1].set_title("Precomputed map")
   fig.colorbar(im1, ax=axs[1], shrink=0.6)
-  im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
-  axs[2].set_title("Difference map")
+  im2 = axs[2].imshow((diff_map/np.max(em_map))*100, cmap='viridis', interpolation='nearest')
+  axs[2].set_title("Difference map (%)")
   fig.colorbar(im2, ax=axs[2], shrink=0.6)
   # save the figure
   fig.savefig(f"../plots/maps/version_{version_num}/maps_{index}.png")
@@ -216,7 +216,7 @@ if __name__ == "__main__":
   # plt.show()
   start = time.time()
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  version_num = 45
+  version_num = 52
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
 
