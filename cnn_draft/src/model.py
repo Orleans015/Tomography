@@ -14,14 +14,6 @@ class Reshape(nn.Module):
 
   def forward(self, x):
     return x.view(*self.shape)
-  
-# class Reshape(nn.Module):
-#   def __init__(self, shape):
-#     super().__init__()
-#     self.shape = shape
-
-#   def forward(self, x):
-#     return torch.reshape(self.shape)
 
 class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate):

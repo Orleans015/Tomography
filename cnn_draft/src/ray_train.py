@@ -342,7 +342,7 @@ search_space = {
     "tcnn_size_4": tune.choice([2, 4, 8, 16, 32]),
 }
 
-num_samples = 1000
+num_samples = 50
 
 # scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
 
