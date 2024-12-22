@@ -226,5 +226,5 @@ if __name__ == "__main__":
   em, em_hat = plot_maps(model, datamodule)
   stop = time.time()
   print(f"Time elapsed: {stop - start}")
-  for i in range(32):
+  for i in range(len(em)):
     plot_maps_for_loop(em, em_hat, i, version_num)
