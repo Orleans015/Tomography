@@ -200,7 +200,7 @@ class TomoModel(L.LightningModule):
   def configure_optimizers(self):
     return optim.Adam(self.parameters(), lr=self.lr)  # Use Adam optimizer with the specified learning rate
 
-# Deffine the Dataset and DataModule classes
+# Define the Dataset and DataModule classes
 class TomographyDataset(torch.utils.data.Dataset):
   def __init__(self, data_dir, file_name):
     self.data_dir = data_dir
