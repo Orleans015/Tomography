@@ -35,9 +35,11 @@ sample_dtype = np.dtype(
         # toroidal modes, b_rad are the radial modes, phi_tor are the phases of
         # the toroidal magnetic in the poloidal plane computed at 202.5 degrees,
         # that is the position of the soft X-ray detectors
+        ('b_time', np.float32), # Time of the shot (ex: 0.0140)
         ('b_tor', np.float32, (24,)), # amplitude of the toroidal modes 
         ('b_rad', np.float32, (24,)), # amplitude of the radial modes
         ('phi_tor', np.float32, (24,)), # phases of the toroidal mode
+        ('phi_rad', np.float32, (24,)), # phases of the radial mode
     ]    
   )
 

@@ -4,6 +4,7 @@ from model import TomoModel
 from dataset import TomographyDataModule
 import config
 from callbacks import PrintingCallback, SaveBest, EarlyStopping
+from torch.utils.tensorboard import SummaryWriter
 from lightning.pytorch.loggers import TensorBoardLogger
 
 torch.set_float32_matmul_precision("medium")

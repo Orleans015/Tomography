@@ -10,6 +10,7 @@ class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
     self.lr = learning_rate
+    self.weight_decay = 1e-5  # Define the weight decay, this is used to prevent overfitting by penalizing large weights (L2 regularization)
     # Leaky ReLU activation function takes as argument the negative slope of the
     # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
     # of the negative slope is 0.01.
@@ -23,7 +24,7 @@ class TomoModel(L.LightningModule):
         nn.Linear(128, outputsize)  # Define Final linear layer with output size
     )
     self.loss_rate = 0.2  # Define the loss rate
-    self.loss_fn = nn.MSELoss()#nn.L1Loss()  # Define the loss function as CrossEntropyLoss
+    self.loss_fn = nn.L1Loss()#nn.MSELoss()L1Loss()  # Define the loss function
     self.best_val_loss = torch.tensor(float('inf'))  # Initialize the best validation loss
     self.mse = torchmetrics.MeanSquaredError()  # Define Mean Squared Error metric
     self.mae = torchmetrics.MeanAbsoluteError() # Define Root Mean Squared Error metric
@@ -40,10 +41,10 @@ class TomoModel(L.LightningModule):
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
     self.training_step_outputs.append(loss.detach().cpu().numpy())  # Append the loss to the training step outputs list
-    self.log_dict({'train_loss': loss,
-                   'train_mse': mse,
-                   'train_mae': mae,
-                   'train_r2': r2,
+    self.log_dict({'train/loss': loss,
+                   'train/mse': mse,
+                   'train/mae': mae,
+                   'train/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the training loss, mae, and F1 score
@@ -55,10 +56,10 @@ class TomoModel(L.LightningModule):
     mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.log_dict({'val_loss': loss,
-                   'val_mse': mse,
-                   'val_mae': mae,
-                   'val_r2': r2,
+    self.log_dict({'val/loss': loss,
+                   'val/mse': mse,
+                   'val/mae': mae,
+                   'val/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the validation loss, mae, and F1 score
@@ -69,10 +70,10 @@ class TomoModel(L.LightningModule):
     mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.log_dict({'test_loss': loss,
-                   'test_mse': mse,
-                   'test_mae': mae,
-                   'test_r2': r2,
+    self.log_dict({'test/loss': loss,
+                   'test/mse': mse,
+                   'test/mae': mae,
+                   'test/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the test loss, mae, and F1 score
@@ -104,7 +105,7 @@ class TomoModel(L.LightningModule):
     return preds
   
   def configure_optimizers(self):
-    return optim.Adam(self.parameters(), lr=self.lr)  # Use Adam optimizer with the specified learning rate
+    return optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)  # Use Adam optimizer with the specified learning rate
   
   def calc_em(self, batch, y_hat):
     '''
