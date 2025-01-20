@@ -35,6 +35,7 @@ class TomographyDataset(torch.utils.data.Dataset):
     self.b_tor = bloated_dataset['b_tor']
     self.b_rad = bloated_dataset['b_rad']
     self.phi_tor = bloated_dataset['phi_tor']
+    self.phi_rad = bloated_dataset['phi_rad']
     self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles = utils.compute_bessel_n_mesh(self.minr, self.majr, self.x_emiss, self.y_emiss)
 
   def __len__(self):
