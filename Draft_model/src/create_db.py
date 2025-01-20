@@ -36,10 +36,10 @@ sample_dtype = np.dtype(
         # the toroidal magnetic in the poloidal plane computed at 202.5 degrees,
         # that is the position of the soft X-ray detectors
         ('b_time', np.float32), # Time of the shot (ex: 0.0140)
-        ('b_tor', np.float32, (24,)), # amplitude of the toroidal modes 
-        ('b_rad', np.float32, (24,)), # amplitude of the radial modes
-        ('phi_tor', np.float32, (24,)), # phases of the toroidal mode
-        ('phi_rad', np.float32, (24,)), # phases of the radial mode
+        ('b_tor', np.float32, (25,)), # amplitude of the toroidal modes 
+        ('b_rad', np.float32, (25,)), # amplitude of the radial modes
+        ('phi_tor', np.float32, (25,)), # phases of the toroidal mode
+        ('phi_rad', np.float32, (25,)), # phases of the radial mode
     ]    
   )
 
@@ -71,7 +71,18 @@ def read_tomography(file):
         print(f'File {dir + file} not found')
         return None
     st_e = datum['st_e']
+    st_mag = datum['st_mag']
     n_tot = len(st_e['t'][0])
+    are_in = np.isin(np.round(st_mag['md'][0]['time'][0]*1e-3, 4), np.round(st_e['t'][0], 4)) # mask for the time of the magnetic field data 
+    # assert np.all(are_in), 'The time of the magnetic field data is not the same as the time of the emissivity data'
+    mask_tmag = np.array([np.argmin(np.abs(st_mag['md'][0]['time'][0]*1e-3 - st_e['t'][0][i])) for i in range(n_tot)])
+    mask_tmag2 = np.where(are_in)[0]
+    # assert np.all(mask_tmag == mask_tmag2), 'The mask for the magnetic field data is not the same as the mask for the emissivity data'
+    # print the maximum errors for every data['st_mag']['md'][0]['time']
+    errors = [np.abs(st_mag['md'][0]['time'][0][mask_tmag[i]]*1e-3 - st_e['t'][0][i]) for i in range(n_tot)]
+    max_err_i = np.argmax(errors)
+    assert errors[max_err_i] < 1e-4, f'The maximum error between the time of the magnetic field data and the emissivity data is {errors[max_err_i]}, at index {max_err_i}'
+
     # Create a structured array with the sample dtype
     sample = np.empty(n_tot, dtype=sample_dtype)
     if len(datum['st']['bright'][0]['data'][0][0]) == 92:
@@ -97,6 +108,10 @@ def read_tomography(file):
                 sample[i - k]['data_err'][sample[i - k]['data_err'] == 0.] = sample[i - k]['data'][sample[i - k]['data_err'] == 0.]*0.1
                 sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
                 sample[i - k]['emiss'] = st_e['emiss'][0][i]
+                sample[i - k]['b_tor'] = st_mag['mode'][0]['m1a'][0][mask_tmag][i]  # the shape of this is (24, 1)
+                sample[i - k]['b_rad'] = st_mag['moder'][0]['m1a'][0][mask_tmag][i]  # the shape of this is (24, 1)
+                sample[i - k]['phi_tor'] = st_mag['mode'][0]['m1f'][0][mask_tmag][i]  # the shape of this is (24, 1)
+                sample[i - k]['phi_rad'] = st_mag['moder'][0]['m1f'][0][mask_tmag][i]  # the shape of this is (24, 1)
             else:
                 k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
@@ -131,6 +146,10 @@ def read_tomography(file):
                 sample[i-k]['time'] = tempo
                 sample[i-k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
                 sample[i-k]['emiss'] = st_e['emiss'][0][i]
+                sample[i-k]['b_tor'] = st_mag['mode'][0]['m1a'][0][mask_tmag][i]
+                sample[i-k]['b_rad'] = st_mag['moder'][0]['m1a'][0][mask_tmag][i]
+                sample[i-k]['phi_tor'] = st_mag['mode'][0]['m1f'][0][mask_tmag][i]
+                sample[i-k]['phi_rad'] = st_mag['moder'][0]['m1f'][0][mask_tmag][i]
             else:
                 k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
