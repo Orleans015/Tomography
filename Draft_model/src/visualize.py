@@ -14,7 +14,7 @@ def visualize():
   # Define an instance of the model
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
   # Load the best model
-  version_num = 21
+  version_num = 66
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
   print(model)
@@ -228,3 +228,7 @@ if __name__ == "__main__":
   print(f"Time elapsed: {stop - start}")
   for i in range(len(em)):
     plot_maps_for_loop(em, em_hat, i, version_num)
+
+  print("Starting visualization...")
+  visualize()
+  print("Visualization done!")

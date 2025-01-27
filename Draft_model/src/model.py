@@ -10,7 +10,7 @@ class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate, outputsize):
     super().__init__()
     self.lr = learning_rate
-    self.weight_decay = 1e-5  # Define the weight decay, this is used to prevent overfitting by penalizing large weights (L2 regularization)
+    self.weight_decay = 1e-6  # Define the weight decay, this is used to prevent overfitting by penalizing large weights (L2 regularization)
     # Leaky ReLU activation function takes as argument the negative slope of the
     # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
     # of the negative slope is 0.01.

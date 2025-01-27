@@ -19,15 +19,15 @@ class PrintingCallback(Callback):
   def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
     print("Training is done!")
     # give a summary of the los functionand accuracy
-    print(f"training loss: {trainer.callback_metrics['train_loss']}")
-    print(f"training accuracy: {trainer.callback_metrics['train_r2']}")
+    print(f"training loss: {trainer.callback_metrics['train/loss']}")
+    print(f"training accuracy: {trainer.callback_metrics['train/r2']}")
     return super().on_train_end(trainer, pl_module)
   
   def on_validation_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
     # print(f"Validation loss: {trainer.callback_metrics['val_loss']}")
-    self.val_loss.append(trainer.callback_metrics['val_loss'])
+    self.val_loss.append(trainer.callback_metrics['val/loss'])
     # print(f"Validation accuracy: {trainer.callback_metrics['val_r2']}")
-    self.val_accuracy.append(trainer.callback_metrics['val_r2'])
+    self.val_accuracy.append(trainer.callback_metrics['val/r2'])
     if len(self.val_loss) == 100:
       print(f"Average validation loss: {sum(self.val_loss)/len(self.val_loss)}")
       print(f"Average validation accuracy: {sum(self.val_accuracy)/len(self.val_accuracy)}")      

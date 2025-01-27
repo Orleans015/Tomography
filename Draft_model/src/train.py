@@ -34,7 +34,7 @@ def main():
         precision=config.PRECISION,
         enable_progress_bar=True, # Set to True to enable progress bar
         callbacks=[PrintingCallback(),
-                   SaveBest(monitor="val_loss", logger=logger),
+                   SaveBest(monitor="val/loss", logger=logger),
                    # EarlyStopping(monitor="val_loss"),
                    ],
     )
