@@ -216,7 +216,7 @@ if __name__ == "__main__":
   # plt.show()
   start = time.time()
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE, config.OUTPUTSIZE)
-  version_num = 58
+  version_num = 69
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
 
@@ -229,6 +229,12 @@ if __name__ == "__main__":
   for i in range(len(em)):
     plot_maps_for_loop(em, em_hat, i, version_num)
 
+  # Compute the mean distance between the computed map and the target emissivity map
+  mean_distance = np.mean([np.abs(em[i].detach().numpy() - em_hat[i].detach().numpy()) for i in range(len(em))])
+  # print the mean emissivity of the target maps in their values > 0
+  print(f"Mean emissivity of the target maps (values > 0): {np.mean([np.mean(em[i].detach().numpy()[em[i].detach().numpy() > 0]) for i in range(len(em))])}")
+  
+  print(f"Mean distance between computed map and target emissivity map: {mean_distance}")
   print("Starting visualization...")
   visualize()
   print("Visualization done!")

@@ -18,39 +18,145 @@ class Reshape(nn.Module):
 class TomoModel(L.LightningModule):
   def __init__(self, inputsize, learning_rate):
     super().__init__()
+    def compute_block(input_channels, output_channels):
+      return nn.Sequential(
+        nn.ConvTranspose2d(input_channels, input_channels, kernel_size=2, stride=2, padding=0),
+        nn.Conv2d(input_channels, input_channels, kernel_size=3, stride=1, padding=0),
+        nn.LeakyReLU(),
+        nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=1, padding=0),
+        nn.LeakyReLU(),
+      )
+
+    self.lr = learning_rate
+    self.side = 11
+    self.linear = nn.Sequential(
+        nn.Linear( inputsize, self.side*self.side),
+        nn.LeakyReLU(),
+        Reshape([-1, 1, self.side, self.side]),
+    )        
+
+    self.tconv = nn.Sequential(
+      compute_block(1, 8),
+      compute_block(8, 8),
+      compute_block(8, 8),
+      compute_block(8, 1),
+      nn.Conv2d(1, 1, kernel_size=5, stride=1, padding=0),
+      nn.LeakyReLU(),
+      nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=0),
+      nn.Sigmoid(),
+    )
+
+    self.net = nn.Sequential(
+        self.linear,
+        self.tconv,
+    )
+
+    self.loss_fn = nn.L1Loss()
+    self.best_val_loss = torch.tensor(float('inf'))
+    self.mse = torchmetrics.MeanSquaredError()
+    self.r2 = torchmetrics.R2Score()
+    self.training_step_outputs = []
+
+
+  def compute_tconv_output_size(self, input_size, kernel_size, stride, padding):
+    return (input_size - 1) * stride - 2 * padding + kernel_size
+  
+  def compute_conv_output_size(self, input_size, kernel_size, stride, padding):
+    return (input_size - kernel_size + 2 * padding) // stride + 1
+
+  def forward(self, x):
+    x = self.net(x)
+    return x
+  
+  def training_step(self, batch, batch_idx):
+    loss, y_hat, y = self._common_step(batch, batch_idx)
+    mse = self.mse(y_hat, y)
+    r2 = self.r2(y_hat.view(-1), y.view(-1))
+    self.training_step_outputs.append(loss.detach().cpu().numpy())
+    self.log_dict({'train/loss': loss,
+                   'train/mse': mse,
+                   'train/r2': r2,
+                   },
+                   on_step=False, on_epoch=True, prog_bar=True
+                   )
+    return loss
+  
+  def validation_step(self, batch, batch_idx):
+    loss, y_hat, y = self._common_step(batch, batch_idx)
+    mse = self.mse(y_hat, y)
+    r2 = self.r2(y_hat.view(-1), y.view(-1))
+    self.log_dict({'val/loss': loss,
+                   'val/mse': mse,
+                   'val/r2': r2,
+                   },
+                   on_step=False, on_epoch=True, prog_bar=True
+                   )
+    return loss
+
+  def test_step(self, batch, batch_idx):
+    loss, y_hat, y = self._common_step(batch, batch_idx)
+    mse = self.mse(y_hat, y)
+    r2 = self.r2(y_hat.view(-1), y.view(-1))
+    self.log_dict({'test/loss': loss,
+                   'test/mse': mse,
+                   'test/r2': r2,
+                   },
+                   on_step=False, on_epoch=True, prog_bar=True
+                   )
+    return loss
+
+  def _common_step(self, batch, batch_idx):
+    x, y = batch
+    y_hat = self(x)
+    loss = self.loss_fn(y_hat, y)
+    return loss, y_hat, y
+  
+  def predict_step(self, batch, batch_idx):
+    x = batch
+    x = x.reshape(x.size(0), -1)
+    y_hat = self(x)
+    preds = torch.argmax(y_hat, dim=1)
+    return preds
+  
+  def configure_optimizers(self):
+    return optim.Adam(self.parameters(), lr=self.lr)
+  
+class TomoModelUNet(L.LightningModule):
+  def __init__(self, inputsize, learning_rate):
+    super().__init__()
     self.lr = learning_rate
     # Leaky ReLU activation function takes as argument the negative slope of the
     # rectifier: f(x) = max(0, x) + negative_slope * min(0, x). The default value
     # of the negative slope is 0.01.
     self.linear = nn.Sequential(
-        nn.Linear(inputsize, 256),  # Define a linear layer with input size and output size
+        nn.Linear(inputsize, 2420),  # Define a linear layer with input size and output size
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Linear(256, 16*11*11),  # Define another linear layer
+        nn.Linear(2420, 2420),  # Define another linear layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        Reshape([-1, 16, 11, 11]),  # Reshape the tensor First dimension is batch size, second dimension is the number of channels, and the last two dimensions are the height and width of the tensor
+        Reshape([-1, 20, 11, 11]),  # Reshape the tensor First dimension is batch size, second dimension is the number of channels, and the last two dimensions are the height and width of the tensor
     )
     self.anti_conv = nn.Sequential(
-        nn.ConvTranspose2d(16, 16, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(20, 20, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(20, 20, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(20, 20, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(16, 8, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(20, 10, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(10, 10, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(8, 8, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(10, 10, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(8, 4, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(10, 5, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(5, 5, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(5, 5, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.ConvTranspose2d(4, 4, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
-        nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
+        nn.ConvTranspose2d(5, 5, kernel_size=2, stride=2, padding=0),  # Define a convolutional layer with input channels, output channels, kernel size, and padding
+        nn.Conv2d(5, 5, kernel_size=3, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(4, 4, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(5, 5, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
         nn.LeakyReLU(),  # Apply ReLU activation function
-        nn.Conv2d(4, 1, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
+        nn.Conv2d(5, 1, kernel_size=5, stride=1, padding=0),  # Define another convolutional layer
     )
 
     self.net = nn.Sequential(
@@ -78,10 +184,10 @@ class TomoModel(L.LightningModule):
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
     self.training_step_outputs.append(loss.detach().cpu().numpy())  # Append the loss to the training step outputs list
-    self.log_dict({'train_loss': loss,
+    self.log_dict({'train/loss': loss,
                   #  'train_mse': mse,
-                   'train_mae': mae,
-                   'train_r2': r2,
+                   'train/mae': mae,
+                   'train/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the training loss, mae, and F1 score
@@ -93,10 +199,10 @@ class TomoModel(L.LightningModule):
     # mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.log_dict({'val_loss': loss,
-                  #  'val_mse': mse,
-                   'val_mae': mae,
-                   'val_r2': r2,
+    self.log_dict({'val/loss': loss,
+                  #  'val/mse': mse,
+                   'val/mae': mae,
+                   'val/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the validation loss, mae, and F1 score
@@ -107,10 +213,10 @@ class TomoModel(L.LightningModule):
     # mse = self.mse(y_hat, y)  # Compute mse using the y_hat (prediction) and target
     mae = self.mae(y_hat, y)  # Compute mae using the y_hat (prediction) and target
     r2 = self.r2(y_hat.view(-1), y.view(-1))  # Compute r2score using the y_hat (prediction) and target
-    self.log_dict({'test_loss': loss,
+    self.log_dict({'test/loss': loss,
                   #  'test_mse': mse,
-                   'test_mae': mae,
-                   'test_r2': r2,
+                   'test/mae': mae,
+                   'test/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )  # Log the test loss, mae, and F1 score

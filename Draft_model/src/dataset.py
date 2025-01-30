@@ -44,7 +44,7 @@ class TomographyDataset(torch.utils.data.Dataset):
   def __getitem__(self, idx):
     # Return the data and target for the given index, the other data is used only 
     # if the dataset is used for the computation of the emissivity maps.
-    return self.data[idx], self.target[idx] #, self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles
+    return self.data[idx], self.target[idx] , self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles
 
 class TomographyDataModule(L.LightningDataModule):
   def __init__(self, data_dir, file_name, batch_size, num_workers=4):

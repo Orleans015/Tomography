@@ -184,7 +184,7 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
 
 if __name__ == "__main__":
   model = TomoModel(config.INPUTSIZE, config.LEARNING_RATE)
-  version_num = 77 # version number of the model (74 the big one)
+  version_num = 74 # version number of the model (74 the big one)
   assert os.path.exists(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt"), "The model does not exist"
   model.load_state_dict(torch.load(f"TB_logs/my_Tomo_model/version_{version_num}/best_model.ckpt",)['state_dict'])
 
@@ -192,78 +192,93 @@ if __name__ == "__main__":
   datamodule.setup()
 
   val_loader = datamodule.val_dataloader()
-  batch = next(iter(val_loader))
+
+  # Calculate the mean value of the target emissivity of all the validation dataset (excluding the values < 0)
+  all_targets = []
+  for batch in val_loader:
+      targets = batch[1].detach().numpy()
+      targets = targets[targets >= 0]
+      all_targets.extend(targets)
+  mean_target_emissivity = np.mean(all_targets)
+  print(f"Mean value of the target emissivity (excluding values < 0): {mean_target_emissivity}")
+
+  # batch = next(iter(val_loader))
   
-  start = time.time()
-  y_hat = model(batch[0])
-  end = time.time()
+  # start = time.time()
+  # y_hat = model(batch[0])
+  # end = time.time()
   
-  if -10 in batch[0]:
-    y_hat = (y_hat * datamodule.std) + datamodule.mean
-    batch[1] = (batch[1] * datamodule.std) + datamodule.mean
+  # if -10 in batch[0]:
+  #   y_hat = (y_hat * datamodule.std) + datamodule.mean
+  #   batch[1] = (batch[1] * datamodule.std) + datamodule.mean
 
-  # print(f"shape of the batch: {batch[1].shape}")
-  # print(f"shape of the prediction: {y_hat.shape}")
-
-  y_hat = y_hat.reshape(-1, 110, 110)
-  batch[1] = batch[1].reshape(-1, 110, 110)
-
-  # print(f"shape of the batch: {batch[1].shape}")
-  # print(f"shape of the prediction: {y_hat.shape}")
+  # y_hat = y_hat.reshape(-1, 110, 110)
+  # batch[1] = batch[1].reshape(-1, 110, 110)
   
-  # generate random indices in the batch
-  indices = np.random.randint(0, len(batch[1]), 50)
-  for index in indices:
-    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-    im0 = axs[0].imshow(batch[1][index].detach().numpy(), cmap='inferno', interpolation='nearest')
-    axs[0].set_title("Reference map")
-    fig.colorbar(im0, ax=axs[0], shrink=0.6)
-    im1 = axs[1].imshow(y_hat[index].detach().numpy(), cmap='inferno', interpolation='nearest')
-    axs[1].set_title("Model map")
-    fig.colorbar(im1, ax=axs[1], shrink=0.6)
-    diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[index].detach().numpy())
-    im2 = axs[2].imshow(diff_map, cmap='inferno', interpolation='nearest')
-    axs[2].set_title("Difference map")
-    fig.colorbar(im2, ax=axs[2], shrink=0.6)
-    plt.savefig(f"results_{index}.png")
-    plt.close()
-  print(f"Time elapsed: {end - start}")
-  # # Create a slider for selecting the batch index
-  # batch_index_slider = widgets.IntSlider(min=0, max=len(batch[0])-1, step=1, description='Batch Index:')
-  # # Create a button to stop the loop
-  # stop_button = widgets.Button(description="Stop")
-
-  # # Display the slider and button
-  # display(batch_index_slider, stop_button)
-
-  # # Function to update the plots based on the selected batch index
-  # def update_plots(change):
-  #   index = batch_index_slider.value
-  #   y_hat = model(batch[0][index].unsqueeze(0))
-  #   if -10 in batch[0][index]:
-  #     y_hat = (y_hat * datamodule.std) + datamodule.mean
-  #     batch[1][index] = (batch[1][index] * datamodule.std) + datamodule.mean
-
+  # # generate random indices in the batch
+  # indices = range(128)
+  # mean_distances = []
+  # target_max_values = []
+  # target_mean_values = []
+  # for index in indices:
   #   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  #   axs[0].imshow(batch[1][index].detach().numpy(), cmap='viridis', interpolation='nearest')
+  #   im0 = axs[0].imshow(batch[1][index].detach().numpy(), cmap='inferno', interpolation='nearest')
   #   axs[0].set_title("Reference map")
-  #   axs[1].imshow(y_hat[0].detach().numpy(), cmap='viridis', interpolation='nearest')
+  #   fig.colorbar(im0, ax=axs[0], shrink=0.6)
+  #   im1 = axs[1].imshow(y_hat[index].detach().numpy(), cmap='inferno', interpolation='nearest')
   #   axs[1].set_title("Model map")
-  #   diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[0].detach().numpy())
-  #   axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+  #   fig.colorbar(im1, ax=axs[1], shrink=0.6)
+  #   diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[index].detach().numpy())
+  #   im2 = axs[2].imshow(diff_map, cmap='inferno', interpolation='nearest')
   #   axs[2].set_title("Difference map")
-  #   plt.show()
+  #   fig.colorbar(im2, ax=axs[2], shrink=0.6)
+  #   plt.savefig(f"results_{index}.png")
+  #   plt.close()
+  #   mean_distances.append(np.mean(diff_map))
+  #   target_max_values.append(np.max(batch[1][index].detach().numpy()))
+  #   target_mean_values.append(np.mean(batch[1][index].detach().numpy()[batch[1][index].detach().numpy() >= 0]))
+  
+  # mean_distance = np.mean(mean_distances)
+  # print(f"Mean distance between reconstructed and target map: {mean_distance}")
+  # print(f"Time elapsed: {end - start}")
+  # print(f"Maximum values of target maps: {np.max(target_max_values)}")
+  # print(f"Mean values of target maps: {np.mean(target_mean_values)}")
+  # # # Create a slider for selecting the batch index
+  # # batch_index_slider = widgets.IntSlider(min=0, max=len(batch[0])-1, step=1, description='Batch Index:')
+  # # # Create a button to stop the loop
+  # # stop_button = widgets.Button(description="Stop")
 
-  # # Attach the update function to the slider
-  # batch_index_slider.observe(update_plots, names='value')
+  # # # Display the slider and button
+  # # display(batch_index_slider, stop_button)
 
-  # # Function to stop the loop
-  # def stop_loop(b):
-  #   batch_index_slider.close()
-  #   stop_button.close()
+  # # # Function to update the plots based on the selected batch index
+  # # def update_plots(change):
+  # #   index = batch_index_slider.value
+  # #   y_hat = model(batch[0][index].unsqueeze(0))
+  # #   if -10 in batch[0][index]:
+  # #     y_hat = (y_hat * datamodule.std) + datamodule.mean
+  # #     batch[1][index] = (batch[1][index] * datamodule.std) + datamodule.mean
 
-  # # Attach the stop function to the button
-  # stop_button.on_click(stop_loop)
+  # #   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+  # #   axs[0].imshow(batch[1][index].detach().numpy(), cmap='viridis', interpolation='nearest')
+  # #   axs[0].set_title("Reference map")
+  # #   axs[1].imshow(y_hat[0].detach().numpy(), cmap='viridis', interpolation='nearest')
+  # #   axs[1].set_title("Model map")
+  # #   diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[0].detach().numpy())
+  # #   axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
+  # #   axs[2].set_title("Difference map")
+  # #   plt.show()
 
-  # # Initial plot
-  # update_plots(None)
+  # # # Attach the update function to the slider
+  # # batch_index_slider.observe(update_plots, names='value')
+
+  # # # Function to stop the loop
+  # # def stop_loop(b):
+  # #   batch_index_slider.close()
+  # #   stop_button.close()
+
+  # # # Attach the stop function to the button
+  # # stop_button.on_click(stop_loop)
+
+  # # # Initial plot
+  # # update_plots(None)

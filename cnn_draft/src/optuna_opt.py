@@ -100,6 +100,10 @@ class TomoModel(L.LightningModule):
     self.r2 = torchmetrics.R2Score()
     self.training_step_outputs = []
       
+  def compute_dimensions(self, x):
+
+    return
+
   def forward(self, x):
     x = self.net(x)
     return x
@@ -109,9 +113,9 @@ class TomoModel(L.LightningModule):
     mae = self.mae(y_hat, y)
     r2 = self.r2(y_hat.view(-1), y.view(-1))
     self.training_step_outputs.append(loss.detach().cpu().numpy())
-    self.log_dict({'train_loss': loss,
-                   'train_mae': mae,
-                   'train_r2': r2,
+    self.log_dict({'train/loss': loss,
+                   'train/mae': mae,
+                   'train/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )
@@ -121,9 +125,9 @@ class TomoModel(L.LightningModule):
     loss, y_hat, y = self._common_step(batch, batch_idx)
     mae = self.mae(y_hat, y)
     r2 = self.r2(y_hat.view(-1), y.view(-1))
-    self.log_dict({'val_loss': loss,
-                   'val_mae': mae,
-                   'val_r2': r2,
+    self.log_dict({'val/loss': loss,
+                   'val/mae': mae,
+                   'val/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )
@@ -133,9 +137,9 @@ class TomoModel(L.LightningModule):
     loss, y_hat, y = self._common_step(batch, batch_idx)
     mae = self.mae(y_hat, y)
     r2 = self.r2(y_hat.view(-1), y.view(-1))
-    self.log_dict({'test_loss': loss,
-                   'test_mae': mae,
-                   'test_r2': r2,
+    self.log_dict({'test/loss': loss,
+                   'test/mae': mae,
+                   'test/r2': r2,
                    },
                    on_step=False, on_epoch=True, prog_bar=True
                    )
@@ -265,13 +269,13 @@ def objective(trial):
         precision=PRECISION,
         max_epochs=NUM_EPOCHS,
         callbacks=[
-            PyTorchLightningPruningCallback(trial, monitor="val_loss"),
+            PyTorchLightningPruningCallback(trial, monitor="val/loss"),
         ],
         enable_progress_bar=True,
     )
 
     trainer.fit(model, datamodule=dm)
-    val_loss = trainer.callback_metrics["val_loss"].item()
+    val_loss = trainer.callback_metrics["val/loss"].item()
     return val_loss
 
 if __name__ == "__main__":
