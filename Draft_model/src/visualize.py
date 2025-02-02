@@ -9,6 +9,17 @@ import matplotlib.pyplot as plt
 from scipy.special import j0, j1, jn_zeros
 from utils import compute_bessel_n_mesh
 import time
+import seaborn as sns
+
+# Set the style of the plots
+sns.set_theme(context='notebook', 
+        style='white', 
+        palette='deep', 
+        font='sans-serif', 
+        font_scale=1, 
+        color_codes=True, 
+        rc={"axes.grid": False}
+        )
 
 def visualize():
   # Define an instance of the model
@@ -151,7 +162,7 @@ def plot_maps(model, dataloader):
   # return the maps
   return em, em_hat
 
-def plot_maps_for_loop(em, em_hat, index, version_num):
+def plot_maps_for_loop(em, em_hat, index, version_num, val_loader):
   '''This function uses the generated emissivity maps and selects just one of 
    them through the index variable. It then plots the maps side by side and 
    their mean squared difference. It eventually saves the figure as a png file.
@@ -164,17 +175,23 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
   em_hat_map = em_hat[index].detach().numpy()
   # compute the absolute difference
   diff_map = np.abs(em_map - em_hat_map)
+  # get the real coordinates
+  x_emiss = val_loader.dataset.dataset.x_emiss
+  y_emiss = val_loader.dataset.dataset.y_emiss
   # plot the maps side by side
   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  im0 = axs[0].imshow(em_hat_map, cmap='viridis', interpolation='nearest')
+  im0 = axs[0].imshow(em_hat_map, cmap='inferno', interpolation='nearest', extent=[x_emiss.min(), x_emiss.max(), y_emiss.min(), y_emiss.max()])
   axs[0].set_title("Model map")
+  axs[0].invert_yaxis()  # Invert y-axis
   # plot the colorbar rescaled by 60%
   fig.colorbar(im0, ax=axs[0], shrink=0.6)
-  im1 = axs[1].imshow(em_map, cmap='viridis', interpolation='nearest')
+  im1 = axs[1].imshow(em_map, cmap='inferno', interpolation='nearest', extent=[x_emiss.min(), x_emiss.max(), y_emiss.min(), y_emiss.max()])
   axs[1].set_title("Precomputed map")
+  axs[1].invert_yaxis()  # Invert y-axis
   fig.colorbar(im1, ax=axs[1], shrink=0.6)
-  im2 = axs[2].imshow((diff_map/np.max(em_map))*100, cmap='viridis', interpolation='nearest')
+  im2 = axs[2].imshow((diff_map/np.max(em_map))*100, cmap='inferno', interpolation='nearest', extent=[x_emiss.min(), x_emiss.max(), y_emiss.min(), y_emiss.max()])
   axs[2].set_title("Difference map (%)")
+  axs[2].invert_yaxis()  # Invert y-axis
   fig.colorbar(im2, ax=axs[2], shrink=0.6)
   # save the figure
   fig.savefig(f"../plots/maps/version_{version_num}/maps_{index}.png")
@@ -222,12 +239,14 @@ if __name__ == "__main__":
 
   datamodule = TomographyDataModule(config.DATA_DIR, config.FILE_NAME, config.BATCH_SIZE, config.NUM_WORKERS)
   datamodule.setup()
+  # get the validation loader 
+  val_loader = datamodule.val_dataloader()
 
   em, em_hat = plot_maps(model, datamodule)
   stop = time.time()
   print(f"Time elapsed: {stop - start}")
   for i in range(len(em)):
-    plot_maps_for_loop(em, em_hat, i, version_num)
+    plot_maps_for_loop(em, em_hat, i, version_num, val_loader)
 
   # Compute the mean distance between the computed map and the target emissivity map
   mean_distance = np.mean([np.abs(em[i].detach().numpy() - em_hat[i].detach().numpy()) for i in range(len(em))])
@@ -235,6 +254,6 @@ if __name__ == "__main__":
   print(f"Mean emissivity of the target maps (values > 0): {np.mean([np.mean(em[i].detach().numpy()[em[i].detach().numpy() > 0]) for i in range(len(em))])}")
   
   print(f"Mean distance between computed map and target emissivity map: {mean_distance}")
-  print("Starting visualization...")
-  visualize()
-  print("Visualization done!")
+  # print("Starting visualization...")
+  # visualize()
+  # print("Visualization done!")

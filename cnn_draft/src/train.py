@@ -15,7 +15,6 @@ def main():
         inputsize=config.INPUTSIZE,
         learning_rate=config.LEARNING_RATE,
     )
-    print(model)
 
     dm = TomographyDataModule(
         data_dir=config.DATA_DIR,

@@ -11,6 +11,18 @@ from utils import compute_bessel_n_mesh
 import time
 # import ipywidgets as widgets
 # from IPython.display import display
+import seaborn as sns
+
+# Set the style of the plots
+sns.set_theme(context='notebook', 
+        style='white', 
+        palette='deep', 
+        font='sans-serif', 
+        font_scale=1, 
+        color_codes=True, 
+        rc={"axes.grid": False}
+        )
+
 
 def visualize():
   # Define an instance of the model
@@ -147,13 +159,11 @@ def plot_maps(model, dataloader):
     print(f"Std: {dataloader.std}")
     y_hat = (y_hat * dataloader.std) + dataloader.mean
     batch[1] = (batch[1] * dataloader.std) + dataloader.mean
-  # compute the emissivity maps
-  em, em_hat = model.calc_em(batch, y_hat)
   
   # return the maps
-  return em, em_hat
+  return batch[1], y_hat
 
-def plot_maps_for_loop(em, em_hat, index, version_num):
+def plot_maps_for_loop(em, em_hat, index, version_num, dataloader):
   '''This function uses the generated emissivity maps and selects just one of 
    them through the index variable. It then plots the maps side by side and 
    their mean squared difference. It eventually saves the figure as a png file.
@@ -162,21 +172,27 @@ def plot_maps_for_loop(em, em_hat, index, version_num):
   if not os.path.exists(f"../plots/maps/version_{version_num}"):
     os.makedirs(f"../plots/maps/version_{version_num}")
   # select one of the maps from the batches em and em_hat
-  em_map = em[index].detach().numpy()
-  em_hat_map = em_hat[index].detach().numpy()
+  em_map = em[index].detach().numpy().reshape(110, 110)
+  em_hat_map = em_hat[index].detach().numpy().reshape(110, 110)
   # compute the absolute difference
   diff_map = np.abs(em_map - em_hat_map)
+  # get the coordinates 
+  x_emiss = dataloader.dataset.dataset.x_emiss
+  y_emiss = dataloader.dataset.dataset.y_emiss
   # plot the maps side by side
   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  im0 = axs[0].imshow(em_hat_map, cmap='viridis', interpolation='nearest')
+  im0 = axs[0].imshow(em_hat_map, cmap='inferno', interpolation='nearest', extent=[x_emiss.min(), x_emiss.max(), y_emiss.min(), y_emiss.max()])
   axs[0].set_title("Model map")
+  axs[0].invert_yaxis()
   # plot the colorbar rescaled by 60%
   fig.colorbar(im0, ax=axs[0], shrink=0.6)
-  im1 = axs[1].imshow(em_map, cmap='viridis', interpolation='nearest')
+  im1 = axs[1].imshow(em_map, cmap='inferno', interpolation='nearest', extent=[x_emiss.min(), x_emiss.max(), y_emiss.min(), y_emiss.max()])
   axs[1].set_title("Precomputed map")
+  axs[1].invert_yaxis()
   fig.colorbar(im1, ax=axs[1], shrink=0.6)
-  im2 = axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
-  axs[2].set_title("Difference map")
+  im2 = axs[2].imshow((diff_map/np.max(em_map))*100, cmap='inferno', interpolation='nearest', extent=[x_emiss.min(), x_emiss.max(), y_emiss.min(), y_emiss.max()])
+  axs[2].set_title("Difference map (%)")
+  axs[2].invert_yaxis()
   fig.colorbar(im2, ax=axs[2], shrink=0.6)
   # save the figure
   fig.savefig(f"../plots/maps/version_{version_num}/maps_{index}.png")
@@ -193,6 +209,13 @@ if __name__ == "__main__":
 
   val_loader = datamodule.val_dataloader()
 
+  # generate the maps
+  em, em_hat = plot_maps(model, datamodule)
+  # plot the maps
+  for i in range(len(em)):
+    plot_maps_for_loop(em, em_hat, i, version_num, val_loader)
+
+
   # Calculate the mean value of the target emissivity of all the validation dataset (excluding the values < 0)
   all_targets = []
   for batch in val_loader:
@@ -202,83 +225,3 @@ if __name__ == "__main__":
   mean_target_emissivity = np.mean(all_targets)
   print(f"Mean value of the target emissivity (excluding values < 0): {mean_target_emissivity}")
 
-  # batch = next(iter(val_loader))
-  
-  # start = time.time()
-  # y_hat = model(batch[0])
-  # end = time.time()
-  
-  # if -10 in batch[0]:
-  #   y_hat = (y_hat * datamodule.std) + datamodule.mean
-  #   batch[1] = (batch[1] * datamodule.std) + datamodule.mean
-
-  # y_hat = y_hat.reshape(-1, 110, 110)
-  # batch[1] = batch[1].reshape(-1, 110, 110)
-  
-  # # generate random indices in the batch
-  # indices = range(128)
-  # mean_distances = []
-  # target_max_values = []
-  # target_mean_values = []
-  # for index in indices:
-  #   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  #   im0 = axs[0].imshow(batch[1][index].detach().numpy(), cmap='inferno', interpolation='nearest')
-  #   axs[0].set_title("Reference map")
-  #   fig.colorbar(im0, ax=axs[0], shrink=0.6)
-  #   im1 = axs[1].imshow(y_hat[index].detach().numpy(), cmap='inferno', interpolation='nearest')
-  #   axs[1].set_title("Model map")
-  #   fig.colorbar(im1, ax=axs[1], shrink=0.6)
-  #   diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[index].detach().numpy())
-  #   im2 = axs[2].imshow(diff_map, cmap='inferno', interpolation='nearest')
-  #   axs[2].set_title("Difference map")
-  #   fig.colorbar(im2, ax=axs[2], shrink=0.6)
-  #   plt.savefig(f"results_{index}.png")
-  #   plt.close()
-  #   mean_distances.append(np.mean(diff_map))
-  #   target_max_values.append(np.max(batch[1][index].detach().numpy()))
-  #   target_mean_values.append(np.mean(batch[1][index].detach().numpy()[batch[1][index].detach().numpy() >= 0]))
-  
-  # mean_distance = np.mean(mean_distances)
-  # print(f"Mean distance between reconstructed and target map: {mean_distance}")
-  # print(f"Time elapsed: {end - start}")
-  # print(f"Maximum values of target maps: {np.max(target_max_values)}")
-  # print(f"Mean values of target maps: {np.mean(target_mean_values)}")
-  # # # Create a slider for selecting the batch index
-  # # batch_index_slider = widgets.IntSlider(min=0, max=len(batch[0])-1, step=1, description='Batch Index:')
-  # # # Create a button to stop the loop
-  # # stop_button = widgets.Button(description="Stop")
-
-  # # # Display the slider and button
-  # # display(batch_index_slider, stop_button)
-
-  # # # Function to update the plots based on the selected batch index
-  # # def update_plots(change):
-  # #   index = batch_index_slider.value
-  # #   y_hat = model(batch[0][index].unsqueeze(0))
-  # #   if -10 in batch[0][index]:
-  # #     y_hat = (y_hat * datamodule.std) + datamodule.mean
-  # #     batch[1][index] = (batch[1][index] * datamodule.std) + datamodule.mean
-
-  # #   fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-  # #   axs[0].imshow(batch[1][index].detach().numpy(), cmap='viridis', interpolation='nearest')
-  # #   axs[0].set_title("Reference map")
-  # #   axs[1].imshow(y_hat[0].detach().numpy(), cmap='viridis', interpolation='nearest')
-  # #   axs[1].set_title("Model map")
-  # #   diff_map = np.abs(batch[1][index].detach().numpy() - y_hat[0].detach().numpy())
-  # #   axs[2].imshow(diff_map, cmap='viridis', interpolation='nearest')
-  # #   axs[2].set_title("Difference map")
-  # #   plt.show()
-
-  # # # Attach the update function to the slider
-  # # batch_index_slider.observe(update_plots, names='value')
-
-  # # # Function to stop the loop
-  # # def stop_loop(b):
-  # #   batch_index_slider.close()
-  # #   stop_button.close()
-
-  # # # Attach the stop function to the button
-  # # stop_button.on_click(stop_loop)
-
-  # # # Initial plot
-  # # update_plots(None)
