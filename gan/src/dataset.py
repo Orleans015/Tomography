@@ -48,12 +48,12 @@ class TomographyDataset(torch.utils.data.Dataset):
     return self.data[idx], self.target[idx] #, self.j0, self.j1, self.em, self.em_hat, self.radii, self.angles
 
 class TomographyDataModule(L.LightningDataModule):
-  def __init__(self, data_dir, file_name, batch_size, num_workers=4):
+  def __init__(self, config):
     super().__init__()
-    self.data_dir = data_dir
-    self.file_name = file_name
-    self.batch_size = batch_size
-    self.num_workers = num_workers
+    self.data_dir = config['data_dir']
+    self.file_name = config['file_name']
+    self.batch_size = config['batch_size']
+    self.num_workers = config['num_workers']
     self.mean = 0.
     self.std = 0.
 

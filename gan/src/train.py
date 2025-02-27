@@ -2,37 +2,35 @@ import lightning as L
 import torch
 from model import *
 from dataset import TomographyDataModule
-import config
+import config as C
 from callbacks import PrintingCallback, SaveBest, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 
 torch.set_float32_matmul_precision("medium")
 
+config = C.config
+
 def main():
     logger = TensorBoardLogger("TB_logs", name="my_Tomo_model")
 
-    model = TomoModel(
-        inputsize=config.INPUTSIZE,
-        learning_rate=config.LEARNING_RATE,
+    model = TomoGAN(
+        config=config,
     )
 
     dm = TomographyDataModule(
-        data_dir=config.DATA_DIR,
-        file_name=config.FILE_NAME,
-        batch_size=config.BATCH_SIZE,
-        num_workers=config.NUM_WORKERS,
+        config=config,
     )
 
     trainer = L.Trainer(
         logger=logger,
-        accelerator=config.ACCELERATOR,
-        devices=config.DEVICES,
+        accelerator=config["accelerator"],
+        devices=config["devices"],
         min_epochs=1,
-        max_epochs=config.NUM_EPOCHS,
-        precision=config.PRECISION,
+        max_epochs=config["num_epochs"],
+        precision=config["precision"],
         enable_progress_bar=True, # Set to True to enable progress bar
         callbacks=[PrintingCallback(),
-                   SaveBest(monitor="val/loss", logger=logger),
+                   #SaveBest(monitor="val/loss", logger=logger),
                    # EarlyStopping(monitor="val_loss"),
                    ],
     )
@@ -47,13 +45,3 @@ def main():
 
 if __name__ == "__main__":
     model, dm = main()
-    # # Test the model on a batch from the test set
-    # test_loader = dm.test_dataloader()
-    # test_batch = next(iter(test_loader))
-    # x, y = test_batch
-    # model.eval()
-    # with torch.no_grad():
-    #     pred = model(x)
-    # print("Predicted: ", pred)
-    # print("Actual: ", y)
-    # print("Difference: ", pred - y)

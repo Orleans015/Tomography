@@ -19,6 +19,6 @@ README.md
 *.sav
 *TB_logs*
 *__pycache__*
-*data*
+*data
 *txt*
 *lightning_logs*
