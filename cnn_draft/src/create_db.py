@@ -6,6 +6,9 @@ from scipy.interpolate import BSpline, splrep
 from tqdm import tqdm
 from time import sleep
 
+# The finesse of the Bessel functions is set to 2**6, that is 64 points and it is
+# hard coded in the sample_dtype, if this were to change the dtype would have to be
+# changed as well!!!
 # define a sample of an element in the database
 sample_dtype = np.dtype(
     [
@@ -27,10 +30,13 @@ sample_dtype = np.dtype(
         
         ('target', np.float32, (21,)), # These are the coefficients of the expansion
         ('emiss', np.float32, (110,110)), # Emissivity in the mesh
+        ('rec_emiss', np.float32, (64,64)), # Reconstructed emissivity in the mesh
         ('x_emiss', np.float32, (110,)), # Vector of x coordinates for the mesh
         ('y_emiss', np.float32, (110,)), # Vector of y coordinates for the mesh
         ('majr', np.float32), # Major radius of the machine (for rfx-mod is 2m)
         ('minr', np.float32), # Minor radius of the plasma (for rfx-mod is 0.459m)
+        ('theta', np.float32, (64,)), # Vector of angles for the mesh
+        ('radii', np.float32, (64,)), # Vector of radii for the mesh
         # Amplitudes and phases of the m = 1, n = -7 to -24 modes, b_tor are the
         # toroidal modes, b_rad are the radial modes, phi_tor are the phases of
         # the toroidal magnetic in the poloidal plane computed at 202.5 degrees,
@@ -58,7 +64,84 @@ def maximum_los():
                 n_max = n_tot
     print(f'The maximum number of lines of sight in the db is {n_tot}')
 
+def compute_bessel(m = 2, l = 7, finesse = 2**6):
+    """
+    Computes the Bessel functions J0 and J1 at specific radii and their corresponding zeros.
 
+    Parameters:
+        m (int, optional): The number of Bessel functions to compute zeros for. Defaults to 2.
+        l (int, optional): The number of zeros to compute for each Bessel function. Defaults to 7.
+        finesse (int, optional): The number of points to compute for the radii and theta arrays. Defaults to 2**6.
+
+    Returns:
+        tuple: A tuple containing:
+            - J0_xr (numpy.ndarray): The values of the Bessel function J0 at the computed zeros times the radii.
+            - J1_xr (numpy.ndarray): The values of the Bessel function J1 at the computed zeros times the radii.
+            - radii (numpy.ndarray): The array of radii values ranging from 0 to 1.
+            - theta (numpy.ndarray): The array of angular values ranging from 0 to 2π.
+    """
+    from scipy.special import j0, j1, jn_zeros
+    ### 1. Compute the zeros of the Bessel functions Jml
+	# Stores the zeros
+    zeros = np.array([jn_zeros(_m, l) for _m in range(m)])
+	# Adds the first trivial zero to the zeros of the bessel function Jml
+    zero = np.zeros(1)
+	# Concatenate the zeros[1] minus the last element to the array zero
+    zero = np.concatenate((zero, zeros[1, :-1]))
+    zeros[1] = zero
+
+    ### 2. Compute the values of the Bessel functions J0 and J1 at the zeros times the radius
+    radii = np.linspace(0,1,finesse)
+    theta = np.linspace(0, 2*np.pi, finesse)
+    J0_xr = np.array([j0(zeros[0]*r) for r in radii])
+    J1_xr = np.array([j1(zeros[1]*r) for r in radii])
+    return J0_xr, J1_xr, radii, theta
+
+
+def reconstruct_polar_emissivity(J0_xr, J1_xr, theta, coeff):
+    """
+    Compute the polar emissivity profile from the provided data and coefficients.
+
+    This function reconstructs a 2D emissivity profile in polar coordinates using 
+    the provided expansion coefficients and basis functions. The emissivity is 
+    calculated as a combination of the zeroth and first-order terms in the expansion.
+
+    Parameters:
+    -----------
+    J0_xr : numpy.ndarray
+        The zeroth-order basis function values.
+    J1_xr : numpy.ndarray
+        The first-order basis function values.
+    theta : numpy.ndarray
+        Array of angular coordinates (in radians) for the polar grid.
+    coeff : numpy.ndarray
+        Expansion coefficients, expected to be a 1D array containing three parts:
+        - a0cl: Coefficients for the zeroth-order term.
+        - a1cl: Coefficients for the cosine term of the first-order expansion.
+        - a1sl: Coefficients for the sine term of the first-order expansion.
+
+    Returns:
+    --------
+    numpy.ndarray
+        A 2D array representing the emissivity profile in polar coordinates, 
+        where the rows correspond to the radial positions and the columns 
+        correspond to the angular positions.
+    """
+    # Take the expansion coefficients from the structure
+    a0cl, a1cl, a1sl = np.split(coeff, 3)
+
+	# Now compute the 2D emissivity profile in polar coordinates
+	# Create an empty list to store the emissivity profile
+    emissivity_profile = []
+	# Iterate over the angles
+    for t in theta:
+        emissivity_profile.append((np.dot(J0_xr, a0cl)) + (np.dot(J1_xr, a1cl)*np.cos(t)) + (np.dot(J1_xr, a1sl)*np.sin(t)))
+	# Convert the list to a numpy array
+    emissivity_profile = np.array(emissivity_profile)
+    # transpose the array
+    emissivity_profile = emissivity_profile.T
+    return emissivity_profile
+    
 def read_tomography(file): 
     dir = "/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/sav_files/"
     # Load the data from the .sav file
@@ -68,6 +151,8 @@ def read_tomography(file):
     except FileNotFoundError:
         print(f'File {dir + file} not found')
         return None
+    # Compute the Bessel functions and their zeros once for all
+    J0_xr, J1_xr, radii, theta = compute_bessel()
     st_e = datum['st_e']
     n_tot = len(st_e['t'][0])
     # Create a structured array with the sample dtype
@@ -95,12 +180,15 @@ def read_tomography(file):
                 sample[i - k]['data_err'][sample[i - k]['data_err'] == 0.] = sample[i - k]['data'][sample[i - k]['data_err'] == 0.]*0.1
                 sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
                 sample[i - k]['emiss'] = st_e['emiss'][0][i]
+                sample[i - k]['rec_emiss'] = reconstruct_polar_emissivity(J0_xr, J1_xr, theta, datum['st']['emiss'][0]['coeff'][0][i])
             else:
                 k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
         sample['y_emiss'] = st_e['Y_EMISS'][0]
         sample['majr'] = st_e['MAJR'][0]
         sample['minr'] = st_e['radius'][0]
+        sample['theta'] = theta
+        sample['radii'] = radii
     else:
         print(f'Augmenting data for shot {st_e["shot"][0]}')
         k = 0
@@ -124,17 +212,20 @@ def read_tomography(file):
                 tt = np.rint(tempo*1e4)
                 shot = st_e['shot'][0]
                 label = r'%5d_%04d' % (shot, tt)
-                sample[i-k]['label'] = label
-                sample[i-k]['shot'] = shot
-                sample[i-k]['time'] = tempo
-                sample[i-k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
-                sample[i-k]['emiss'] = st_e['emiss'][0][i]
+                sample[i - k]['label'] = label
+                sample[i - k]['shot'] = shot
+                sample[i - k]['time'] = tempo
+                sample[i - k]['target'] = datum['st']['emiss'][0]['coeff'][0][i]
+                sample[i - k]['emiss'] = st_e['emiss'][0][i]
+                sample[i - k]['rec_emiss'] = reconstruct_polar_emissivity(J0_xr, J1_xr, theta, datum['st']['emiss'][0]['coeff'][0][i])
             else:
                 k += 1
         sample['x_emiss'] = st_e['X_EMISS'][0]
         sample['y_emiss'] = st_e['Y_EMISS'][0]
         sample['majr'] = st_e['MAJR'][0]
         sample['minr'] = st_e['radius'][0]
+        sample['theta'] = theta
+        sample['radii'] = radii
     return sample[:i-k+1]
 
 def augment_data(logical_array, prel_array, data_array, error_array):
@@ -209,7 +300,7 @@ def create_db():
     directory and saves them in a .npy file named data.npy
     '''
     data_dir = config.DATA_DIR
-    dir = 'home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/sav_files/'
+    dir = '/home/orlandi/devel/Tomography/tomo-rfx/cnn_draft/data/sav_files/'
     file = config.FILE_NAME
     if os.path.exists(data_dir + file):
         return 
